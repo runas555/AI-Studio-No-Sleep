@@ -13,17 +13,25 @@ chrome.runtime.onInstalled.addListener(() => {
     updateToolbarBadge();
 });
 
-// Broadcast wake up pulse over active ports
+// Force-keep the system process awake using official Chrome Power API
+function requestSystemAwake() {
+    try {
+        chrome.power.requestKeepAwake('system');
+        console.log('[AI Studio No Sleep] System background process wake-lock engaged.');
+    } catch (e) {
+        console.warn('[AI Studio No Sleep] Failed to lock system state:', e);
+    }
+}
+
 function broadcastWakeUp() {
     connectedPorts.forEach(port => {
         try {
             port.postMessage({ type: 'WAKE_UP_PULSE' });
         } catch (e) {
-            connectedPorts.delete(port);
+            connectedPorts.add(port);
         }
     });
 
-    // Enforce anti-discard flag on all tabs
     chrome.tabs.query({}, (tabs) => {
         tabs.forEach(tab => {
             if (tab.url && tab.url.includes('aistudio.google.com')) {
@@ -36,6 +44,7 @@ function broadcastWakeUp() {
 }
 
 function startGlobalPulse() {
+    requestSystemAwake();
     if (activePulseInterval) clearInterval(activePulseInterval);
     activePulseInterval = setInterval(broadcastWakeUp, 500);
 }
@@ -53,11 +62,9 @@ function updateToolbarBadge() {
     });
 }
 
-// Persistent Long-lived ports hub
 chrome.runtime.onConnect.addListener((port) => {
     if (port.name === "KeepAlivePort") {
         connectedPorts.add(port);
-        
         if (!activePulseInterval) startGlobalPulse();
 
         port.onDisconnect.addListener(() => {
@@ -65,6 +72,7 @@ chrome.runtime.onConnect.addListener((port) => {
             if (connectedPorts.size === 0 && activePulseInterval) {
                 clearInterval(activePulseInterval);
                 activePulseInterval = null;
+                try { chrome.power.releaseKeepAwake(); } catch (e) {}
             }
         });
     }
@@ -91,13 +99,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true; 
     }
-    
     if (request.type === 'KEEP_ALIVE') {
         if (!activePulseInterval) startGlobalPulse();
         sendResponse({ alive: true });
         return false;
     }
-
     if (request.type === 'TOGGLE_ACTIVE') {
         setTimeout(updateToolbarBadge, 100);
         sendResponse({ ack: true });

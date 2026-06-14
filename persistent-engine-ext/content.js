@@ -1,6 +1,6 @@
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.2 - Invisible Edition)
- * Zero page-DOM modifications. Pure background execution.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.3 - Final Cold Start Fix)
+ * Features: Infrasound Media Priority (1Hz) to completely bypass Edge sleeping mode.
  */
 (function() {
     'use strict';
@@ -30,10 +30,10 @@
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Background shield running invisibly.');
+        console.log('[AI Studio No Sleep] Initializing infrasound shield...');
 
         if (config.audioKeepAlive) {
-            enableUltrasoundPulse();
+            enableInfrasoundPulse();
         }
 
         if (config.activitySimulation) {
@@ -41,8 +41,6 @@
         }
 
         setupLongLivedPort();
-        
-        // Starts observers for StopWatch, Auto-Scroll, Wake-Lock
         startGenerationObserver(lang);
     }
 
@@ -143,7 +141,8 @@
         });
     }
 
-    function enableUltrasoundPulse() {
+    // INFRASOUND HACK: Plays 1Hz at 0.02 volume (100% silent, completely forces Edge media priority)
+    function enableInfrasoundPulse() {
         let audioContext;
         const startAudio = () => {
             if (audioContext) return;
@@ -153,12 +152,14 @@
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(19000, audioContext.currentTime); 
-                gain.gain.setValueAtTime(0.002, audioContext.currentTime); 
+                osc.frequency.setValueAtTime(1, audioContext.currentTime); // 1Hz infrasound
+                gain.gain.setValueAtTime(0.02, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
+                
+                console.log('[AI Studio No Sleep] Infrasound Priority locked.');
                 
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
@@ -245,7 +246,6 @@
         }
     }
 
-    // --- BACKEND STOPWATCH & TAB FLASH ---
     let stopwatchInterval = null;
     let stopwatchSeconds = 0;
     let flashTitleInterval = null;

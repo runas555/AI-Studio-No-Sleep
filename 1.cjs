@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Removes all on-page DOM visual indicators (Invisible Edition).
- * File: patch-invisible.cjs
+ * PATCH SCRIPT: Core Infrasound (1Hz) & chrome.power API integration.
+ * File: patch-cold-start-final.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -12,7 +12,9 @@ const fs = require('fs');
 const path = require('path');
 
 const targetFolder = path.join(process.cwd(), 'persistent-engine-ext');
+const manifestFile = path.join(targetFolder, 'manifest.json');
 const contentFile = path.join(targetFolder, 'content.js');
+const backgroundFile = path.join(targetFolder, 'background.js');
 
 function log(msg, type = 'info') {
     const colors = {
@@ -23,11 +25,146 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- UPDATED INVISIBLE CONTENT SCRIPT ---
-const invisibleContentJs = `
+// --- 1. UPDATE MANIFEST WITH SYSTEM POWER API PERMISSION ---
+function patchManifest() {
+    if (!fs.existsSync(manifestFile)) return false;
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+        
+        if (!manifest.permissions.includes('power')) {
+            manifest.permissions.push('power');
+        }
+        
+        fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 4), 'utf8');
+        log('Added system "power" keep-awake permission to manifest.json.', 'success');
+        return true;
+    } catch (e) {
+        log(`Failed to patch manifest: ${e.message}`, 'error');
+        return false;
+    }
+}
+
+// --- 2. UPDATE BACKGROUND WITH POWER AWAKE FORCE ---
+const updatedBackgroundJs = `
+let activePulseInterval = null;
+const connectedPorts = new Set();
+
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.set({
+        engineActive: true,
+        preventThrottling: true,
+        audioKeepAlive: true,
+        activitySimulation: true,
+        heartbeatRate: 15,
+        savedCyclesCount: 0
+    });
+    updateToolbarBadge();
+});
+
+// Force-keep the system process awake using official Chrome Power API
+function requestSystemAwake() {
+    try {
+        chrome.power.requestKeepAwake('system');
+        console.log('[AI Studio No Sleep] System background process wake-lock engaged.');
+    } catch (e) {
+        console.warn('[AI Studio No Sleep] Failed to lock system state:', e);
+    }
+}
+
+function broadcastWakeUp() {
+    connectedPorts.forEach(port => {
+        try {
+            port.postMessage({ type: 'WAKE_UP_PULSE' });
+        } catch (e) {
+            connectedPorts.add(port);
+        }
+    });
+
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && tab.url.includes('aistudio.google.com')) {
+                chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
+                    if (chrome.runtime.lastError) return;
+                });
+            }
+        });
+    });
+}
+
+function startGlobalPulse() {
+    requestSystemAwake();
+    if (activePulseInterval) clearInterval(activePulseInterval);
+    activePulseInterval = setInterval(broadcastWakeUp, 500);
+}
+
+function updateToolbarBadge() {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        const active = res.engineActive !== false;
+        if (active) {
+            chrome.action.setBadgeText({ text: "ON" });
+            chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+        } else {
+            chrome.action.setBadgeText({ text: "OFF" });
+            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+        }
+    });
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "KeepAlivePort") {
+        connectedPorts.add(port);
+        if (!activePulseInterval) startGlobalPulse();
+
+        port.onDisconnect.addListener(() => {
+            connectedPorts.delete(port);
+            if (connectedPorts.size === 0 && activePulseInterval) {
+                clearInterval(activePulseInterval);
+                activePulseInterval = null;
+                try { chrome.power.releaseKeepAwake(); } catch (e) {}
+            }
+        });
+    }
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        if (res.engineActive !== false) {
+            chrome.tabs.update(activeInfo.tabId, { autoDiscardable: false }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }
+    });
+});
+
+startGlobalPulse();
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'SIGNAL_PREVENT_PAUSE') {
+        chrome.storage.local.get(['savedCyclesCount'], (res) => {
+            const current = res.savedCyclesCount || 0;
+            chrome.storage.local.set({ savedCyclesCount: current + 1 });
+            sendResponse({ ack: true, currentCount: current + 1 });
+        });
+        return true; 
+    }
+    if (request.type === 'KEEP_ALIVE') {
+        if (!activePulseInterval) startGlobalPulse();
+        sendResponse({ alive: true });
+        return false;
+    }
+    if (request.type === 'TOGGLE_ACTIVE') {
+        setTimeout(updateToolbarBadge, 100);
+        sendResponse({ ack: true });
+        return false;
+    }
+});
+`;
+
+// --- 3. UPDATE CONTENT WITH 1HZ INFRASOUND HACK ---
+const updatedContentJs = `
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.2 - Invisible Edition)
- * Zero page-DOM modifications. Pure background execution.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.3 - Final Cold Start Fix)
+ * Features: Infrasound Media Priority (1Hz) to completely bypass Edge sleeping mode.
  */
 (function() {
     'use strict';
@@ -57,10 +194,10 @@ const invisibleContentJs = `
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Background shield running invisibly.');
+        console.log('[AI Studio No Sleep] Initializing infrasound shield...');
 
         if (config.audioKeepAlive) {
-            enableUltrasoundPulse();
+            enableInfrasoundPulse();
         }
 
         if (config.activitySimulation) {
@@ -68,8 +205,6 @@ const invisibleContentJs = `
         }
 
         setupLongLivedPort();
-        
-        // Starts observers for StopWatch, Auto-Scroll, Wake-Lock
         startGenerationObserver(lang);
     }
 
@@ -170,7 +305,8 @@ const invisibleContentJs = `
         });
     }
 
-    function enableUltrasoundPulse() {
+    // INFRASOUND HACK: Plays 1Hz at 0.02 volume (100% silent, completely forces Edge media priority)
+    function enableInfrasoundPulse() {
         let audioContext;
         const startAudio = () => {
             if (audioContext) return;
@@ -180,12 +316,14 @@ const invisibleContentJs = `
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(19000, audioContext.currentTime); 
-                gain.gain.setValueAtTime(0.002, audioContext.currentTime); 
+                osc.frequency.setValueAtTime(1, audioContext.currentTime); // 1Hz infrasound
+                gain.gain.setValueAtTime(0.02, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
+                
+                console.log('[AI Studio No Sleep] Infrasound Priority locked.');
                 
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
@@ -272,7 +410,6 @@ const invisibleContentJs = `
         }
     }
 
-    // --- BACKEND STOPWATCH & TAB FLASH ---
     let stopwatchInterval = null;
     let stopwatchSeconds = 0;
     let flashTitleInterval = null;
@@ -362,17 +499,19 @@ const invisibleContentJs = `
 `;
 
 function run() {
-    if (!fs.existsSync(contentFile)) {
+    if (!fs.existsSync(contentFile) || !fs.existsSync(backgroundFile)) {
         log('Extension assets missing. Run setup.cjs first.', 'error');
         process.exit(1);
     }
 
     try {
-        fs.writeFileSync(contentFile, invisibleContentJs.trim() + '\n', 'utf8');
-        log('Removed all on-page HUD rendering. Extension is now 100% invisible on AI Studio.', 'success');
-        log('Please reload the extension inside edge://extensions/ to apply modifications.', 'info');
+        patchManifest();
+        fs.writeFileSync(contentFile, updatedContentJs.trim() + '\n', 'utf8');
+        fs.writeFileSync(backgroundFile, updatedBackgroundJs.trim() + '\n', 'utf8');
+        log('Applied ultimate Infrasound (1Hz) + chrome.power System keep-awake patches.', 'success');
+        log('Please reload the extension inside edge://extensions/.', 'info');
     } catch (e) {
-        log(`Failed to patch invisible mode: ${e.message}`, 'error');
+        log(`Failed to patch final cold start: ${e.message}`, 'error');
     }
 }
 

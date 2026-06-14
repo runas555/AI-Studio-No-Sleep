@@ -1,6 +1,6 @@
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.7)
- * Strictly targeted to aistudio.google.com with active finish chime.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.8 - Wake Lock & Auto-Scroll)
+ * Strictly targeted to aistudio.google.com with active system lock.
  */
 (function() {
     'use strict';
@@ -30,7 +30,7 @@
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Engagement layers initialized.');
+        console.log('[AI Studio No Sleep] Activation protocols online.');
 
         if (config.audioKeepAlive) {
             enableAudioPulse();
@@ -40,12 +40,10 @@
             startVirtualInteractionLoop();
         }
 
-        // Establish long-lived port connection to prevent Service Worker sleep
         setupLongLivedPort();
-        
         createOnPageIndicator(lang);
         
-        // Start watching for generation completion
+        // Start watching for generation completion (Now with Wake Lock & Auto-Scroll)
         startGenerationObserver();
     }
 
@@ -186,11 +184,9 @@
         }, interval);
     }
 
-    // Long-lived port to keep background worker 100% active
     function setupLongLivedPort() {
         const port = chrome.runtime.connect({ name: "KeepAlivePort" });
         
-        // Listen for pulses driven by background
         port.onMessage.addListener((msg) => {
             if (msg.type === 'WAKE_UP_PULSE') {
                 window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
@@ -201,7 +197,6 @@
         });
 
         port.onDisconnect.addListener(() => {
-            console.log('[AI Studio No Sleep] Port disconnected. Re-establishing channel...');
             setTimeout(setupLongLivedPort, 1000);
         });
     }
@@ -232,16 +227,14 @@
             cursor: default;
         `;
 
-        // Hover-to-fade effect (prohibits HUD from blocking clicks)
         container.addEventListener('mouseenter', () => {
             container.style.opacity = '0.1';
-            container.style.pointerEvents = 'none'; // Click through
+            container.style.pointerEvents = 'none';
         });
 
-        // Restore when mouse leaves the bottom-right corner region
         window.addEventListener('mousemove', (e) => {
             const rect = container.getBoundingClientRect();
-            const padding = 50; // zone of restoration
+            const padding = 50;
             if (
                 e.clientX < rect.left - padding || 
                 e.clientX > rect.right + padding || 
@@ -281,7 +274,6 @@
         document.body.appendChild(container);
     }
 
-    // Synthesis chime sound upon completion
     function playChime() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -289,9 +281,9 @@
             const gain = ctx.createGain();
 
             osc.type = 'triangle';
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5 Note
-            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5 Note
-            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3); // G5 Note
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3);
 
             gain.gain.setValueAtTime(0.15, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
@@ -301,17 +293,64 @@
 
             osc.start();
             osc.stop(ctx.currentTime + 0.6);
-        } catch (e) {
-            // Suppress browser context blockers
+        } catch (e) {}
+    }
+
+    // --- SMART AUTO-SCROLL CONTROLLER ---
+    let scrollInterval = null;
+    function startAutoScroll() {
+        if (scrollInterval) clearInterval(scrollInterval);
+        
+        scrollInterval = setInterval(() => {
+            // 1. Smooth scroll primary viewport window
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            
+            // 2. Smooth scroll any inner scrollable workspace containers
+            const elements = document.querySelectorAll('div, section, main, md-block');
+            elements.forEach(el => {
+                const overflow = window.getComputedStyle(el).overflowY;
+                if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
+                    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+                }
+            });
+        }, 800); // Trigger smooth micro-scrolls every 800ms during active stream
+    }
+
+    function stopAutoScroll() {
+        if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
         }
     }
 
-    // Watches AI Studio DOM state transitions (Generation Active -> Finish)
+    // --- SCREEN WAKE LOCK MANAGER ---
+    let wakeLockInstance = null;
+    async function requestWakeLock() {
+        if (wakeLockInstance) return;
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLockInstance = await navigator.wakeLock.request('screen');
+                console.log('[AI Studio No Sleep] OS Screen Wake Lock successfully active.');
+            }
+        } catch (e) {
+            console.warn('[AI Studio No Sleep] System Wake Lock request rejected:', e);
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLockInstance) {
+            wakeLockInstance.release().then(() => {
+                wakeLockInstance = null;
+                console.log('[AI Studio No Sleep] OS Screen Wake Lock released.');
+            });
+        }
+    }
+
+    // Watches AI Studio DOM state transitions
     function startGenerationObserver() {
         let isGenerating = false;
 
         const observer = new MutationObserver(() => {
-            // AI Studio "Stop/Cancel" button usually appears when stream is active
             const buttons = Array.from(document.querySelectorAll('button'));
             const hasStopButton = buttons.some(btn => {
                 const text = btn.innerText ? btn.innerText.toLowerCase() : '';
@@ -319,11 +358,21 @@
             });
 
             if (hasStopButton && !isGenerating) {
-                isGenerating = true; // Generation started
-                console.log('[AI Studio No Sleep] Detected stream start.');
+                isGenerating = true;
+                console.log('[AI Studio No Sleep] Generation started.');
+                
+                // Engage physical protection systems
+                requestWakeLock();
+                startAutoScroll();
+                
             } else if (!hasStopButton && isGenerating) {
-                isGenerating = false; // Generation finished!
-                console.log('[AI Studio No Sleep] Stream finished. Playing chime.');
+                isGenerating = false;
+                console.log('[AI Studio No Sleep] Generation finished.');
+                
+                // Release protection systems
+                releaseWakeLock();
+                stopAutoScroll();
+                
                 playChime();
             }
         });

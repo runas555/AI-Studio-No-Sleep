@@ -1,6 +1,6 @@
 /**
- * PERSISTENT ENGINE - CONTENT SCRIPT (v1.5 - Counter Restored)
- * Bypasses Chrome throttling and restores real-time activity metrics.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.6)
+ * Specifically optimized for aistudio.google.com
  */
 (function() {
     'use strict';
@@ -21,16 +21,17 @@
         'preventThrottling', 
         'audioKeepAlive', 
         'activitySimulation', 
-        'heartbeatRate'
+        'heartbeatRate',
+        'uiLang'
     ], (result) => {
         config = { ...config, ...result };
         if (config.engineActive) {
-            initEngine();
+            initEngine(result.uiLang || 'RU');
         }
     });
 
-    function initEngine() {
-        console.log('[PersistentEngine] Keep-alive systems active.');
+    function initEngine(lang) {
+        console.log('[AI Studio No Sleep] Active protection layer engaged.');
 
         if (config.audioKeepAlive) {
             enableAudioPulse();
@@ -41,6 +42,9 @@
         }
 
         setupBackgroundListener();
+        
+        // Render beautiful non-intrusive indicator in the bottom-right corner of AI Studio
+        createOnPageIndicator(lang);
     }
 
     function injectDOMHook() {
@@ -50,9 +54,6 @@
                 (function() {
                     'use strict';
                     
-                    console.log('[PersistentEngine/DOM] Injecting rAF and visibility overrides...');
-
-                    // 1. Visibility state override
                     Object.defineProperty(document, 'visibilityState', {
                         get: () => 'visible',
                         configurable: true
@@ -65,7 +66,6 @@
 
                     document.hasFocus = function() { return true; };
 
-                    // 2. Clear property event targets
                     const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
                     blockProperties.forEach(prop => {
                         Object.defineProperty(document, prop, {
@@ -80,12 +80,9 @@
                         });
                     });
 
-                    // 3. Capturing phase event blocker
                     const silentBlocker = function(e) {
                         e.stopImmediatePropagation();
                         e.preventDefault();
-                        
-                        // Notify that we intercepted a sleeping event
                         window.dispatchEvent(new CustomEvent('PERSISTENT_EVENT_BLOCKED'));
                     };
                     const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
@@ -94,7 +91,7 @@
                         document.addEventListener(eventName, silentBlocker, true);
                     });
 
-                    // 4. requestAnimationFrame (rAF) BUSTER
+                    // requestAnimationFrame Bypass
                     const activeRafCallbacks = new Map();
                     let rafIdCounter = 0;
 
@@ -139,10 +136,9 @@
             (document.head || document.documentElement).appendChild(script);
             script.remove();
         } catch (e) {
-            console.error('[PersistentEngine] DOM injection failed:', e);
+            console.error('[AI Studio No Sleep] DOM injection failed:', e);
         }
 
-        // Catch the block notification from page context to increment metrics
         window.addEventListener('PERSISTENT_EVENT_BLOCKED', () => {
             chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
         });
@@ -156,17 +152,12 @@
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = audioContext.createOscillator();
                 const gain = audioContext.createGain();
-                
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(1, audioContext.currentTime);
                 gain.gain.setValueAtTime(0.001, audioContext.currentTime);
-                
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
-                
-                window.removeEventListener('click', startAudio);
-                window.removeEventListener('keydown', startAudio);
             } catch (err) {}
         };
         window.addEventListener('click', startAudio, { passive: true });
@@ -187,7 +178,6 @@
             });
             window.dispatchEvent(moveEvent);
 
-            // FIX: Restore sending pause-prevention signal to background database
             chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
                 if (chrome.runtime.lastError) return;
             });
@@ -198,12 +188,66 @@
         chrome.runtime.onMessage.addListener((message) => {
             if (message && message.type === 'WAKE_UP_PULSE') {
                 window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
-                
-                // Slowly increment counter during active background guard execution
-                if (Math.random() > 0.8) { // Once every few pulses (approx 2-3 seconds)
+                if (Math.random() > 0.8) {
                     chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
                 }
             }
         });
+    }
+
+    // Creates an elegant status card inside AI Studio web page
+    function createOnPageIndicator(lang) {
+        const text = lang === 'RU' ? 'Без сна: Активен' : 'No Sleep: Active';
+        
+        const container = document.createElement('div');
+        container.id = 'ai-studio-nosleep-hud';
+        container.style.cssText = `
+            position: fixed;
+            bottom: 12px;
+            right: 12px;
+            background-color: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #334155;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 999999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        `;
+
+        const dot = document.createElement('div');
+        dot.style.cssText = `
+            width: 8px;
+            height: 8px;
+            background-color: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+        `;
+
+        // Pulse keyframe animation using standard style tag
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes hudPulse {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.2); opacity: 0.6; }
+                100% { transform: scale(1); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        dot.style.animation = 'hudPulse 2s infinite ease-in-out';
+
+        const label = document.createElement('span');
+        label.innerText = text;
+
+        container.appendChild(dot);
+        container.appendChild(label);
+        document.body.appendChild(container);
     }
 })();

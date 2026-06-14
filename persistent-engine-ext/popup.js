@@ -5,7 +5,7 @@
 
 const LOCALIZATION = {
     EN: {
-        logo: "ANTI-PAUSE GUARD",
+        logo: "AI STUDIO NO SLEEP",
         engineTitle: "Background protection",
         engineDesc: "Text will keep generating even if you minimize the browser or switch to another tab.",
         metPrevented: "ACTIVE WORK CYCLES",
@@ -23,7 +23,7 @@ const LOCALIZATION = {
         footer: "Compatible with Microsoft Edge & Google Chrome"
     },
     RU: {
-        logo: "ЗАЩИТА ОТ ПАУЗ",
+        logo: "AI STUDIO NO SLEEP",
         engineTitle: "Работа в фоне",
         engineDesc: "Текст продолжит создаваться, даже если вы свернете браузер или перейдете в другую вкладку.",
         metPrevented: "АКТИВНЫЕ ЦИКЛЫ РАБОТЫ",

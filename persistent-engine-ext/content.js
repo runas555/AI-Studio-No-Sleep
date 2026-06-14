@@ -1,9 +1,12 @@
 /**
- * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.2)
- * Clean, CSP-compliant, non-destructive tab lock logic.
+ * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.3 - Patched)
+ * Features: Immediate Sync DOM injection, Capture-phase event suppression.
  */
 (function() {
     'use strict';
+
+    // FIRST DEFENSE LINE: Inject hook synchronously at document_start to avoid race conditions
+    injectDOMHook();
 
     let config = {
         engineActive: true,
@@ -13,6 +16,7 @@
         heartbeatRate: 15
     };
 
+    // Load user configurations asynchronously for sub-modules
     chrome.storage.local.get([
         'engineActive', 
         'preventThrottling', 
@@ -27,8 +31,7 @@
     });
 
     function initEngine() {
-        console.log('[PersistentEngine] Initiating safe bypass layers...');
-        injectDOMHook();
+        console.log('[PersistentEngine] Initializing secondary keep-alive modules...');
 
         if (config.audioKeepAlive) {
             enableAudioPulse();
@@ -38,7 +41,6 @@
             startVirtualInteractionLoop();
         }
 
-        // Establish keep-alive port with background script to prevent tab discard
         keepAliveConnection();
     }
 
@@ -49,9 +51,9 @@
                 (function() {
                     'use strict';
                     
-                    console.log('[PersistentEngine/DOM] Injecting safe API overrides...');
+                    console.log('[PersistentEngine/DOM] Force Overwriting state properties...');
 
-                    // 1. Spoof Document State Properties (Direct Overwrites)
+                    // 1. Immutable Property Spoofing
                     Object.defineProperty(document, 'visibilityState', {
                         get: () => 'visible',
                         configurable: true
@@ -64,40 +66,38 @@
 
                     document.hasFocus = function() { return true; };
 
-                    // 2. Safeguard against direct 'on' property assignments (onblur, onvisibilitychange)
+                    // 2. Clear property event targets
                     const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
                     blockProperties.forEach(prop => {
                         Object.defineProperty(document, prop, {
                             get: () => null,
-                            set: () => console.log('[PersistentEngine] Blocked direct document property:', prop),
+                            set: () => {},
                             configurable: true
                         });
                         Object.defineProperty(window, prop, {
                             get: () => null,
-                            set: () => console.log('[PersistentEngine] Blocked direct window property:', prop),
+                            set: () => {},
                             configurable: true
                         });
                     });
 
-                    // 3. Block propagation of visibility/focus loss events
-                    const interceptedEvents = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
-                    const nativeAddEventListener = EventTarget.prototype.addEventListener;
-                    EventTarget.prototype.addEventListener = function(type, listener, options) {
-                        if (interceptedEvents.includes(type)) {
-                            const dummyListener = function(e) {
-                                e.stopImmediatePropagation();
-                                e.preventDefault();
-                            };
-                            return nativeAddEventListener.call(this, type, dummyListener, options);
-                        }
-                        return nativeAddEventListener.call(this, type, listener, options);
+                    // 3. CAPTURING PHASE SUPPRESSION (No prototype pollution of addEventListener)
+                    const silentBlocker = function(e) {
+                        e.stopImmediatePropagation();
+                        e.preventDefault();
                     };
+
+                    const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
+                    eventsToCatch.forEach(eventName => {
+                        window.addEventListener(eventName, silentBlocker, true);
+                        document.addEventListener(eventName, silentBlocker, true);
+                    });
                 })();
             `;
             (document.head || document.documentElement).appendChild(script);
             script.remove();
         } catch (e) {
-            console.error('[PersistentEngine] DOM injection failed:', e);
+            console.error('[PersistentEngine] Synchronous DOM injection failed:', e);
         }
     }
 
@@ -118,11 +118,11 @@
                 gain.connect(audioContext.destination);
                 osc.start();
                 
-                console.log('[PersistentEngine] Silent priority audio registered.');
+                console.log('[PersistentEngine] Audio keeps alive.');
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
             } catch (err) {
-                console.warn('[PersistentEngine] Audio deferred:', err);
+                console.warn('[PersistentEngine] Audio waiting:', err);
             }
         };
         window.addEventListener('click', startAudio, { passive: true });
@@ -134,7 +134,6 @@
         setInterval(() => {
             if (!config.engineActive) return;
 
-            // Emulate minor micro-movements to reset idle limits
             const moveEvent = new MouseEvent('mousemove', {
                 bubbles: true,
                 cancelable: true,
@@ -151,7 +150,6 @@
     }
 
     function keepAliveConnection() {
-        // Keeps background worker awake and informs browser the tab is actively communicating
         setInterval(() => {
             chrome.runtime.sendMessage({ type: 'KEEP_ALIVE' }, () => {
                 if (chrome.runtime.lastError) return;

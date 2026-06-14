@@ -18,4 +18,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true; 
     }
+    
+    if (request.type === 'KEEP_ALIVE') {
+        // Resolve channel cleanly to prevent extension port exceptions
+        sendResponse({ alive: true });
+        return false;
+    }
 });

@@ -1,5 +1,5 @@
 /**
- * UI CONTROLLER (With Multi-language support)
+ * UI CONTROLLER (With Multilingual SVG Flag Controller)
  */
 
 const LOCALIZATION = {
@@ -41,7 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLang = 'EN';
 
     const dom = {
-        langToggle: document.getElementById('langToggle'),
+        langBtnEN: document.getElementById('langBtnEN'),
+        langBtnRU: document.getElementById('langBtnRU'),
         logo: document.getElementById('txt-logo'),
         engineTitle: document.getElementById('txt-engine-title'),
         engineDesc: document.getElementById('txt-engine-desc'),
@@ -65,7 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLanguage(lang) {
         currentLang = lang;
-        dom.langToggle.innerText = lang === 'EN' ? 'RU' : 'EN';
+        
+        // Toggle active segment buttons
+        if (lang === 'EN') {
+            dom.langBtnEN.classList.add('active');
+            dom.langBtnRU.classList.remove('active');
+        } else {
+            dom.langBtnRU.classList.add('active');
+            dom.langBtnEN.classList.remove('active');
+        }
         
         const t = LOCALIZATION[lang];
         dom.logo.innerText = t.logo;
@@ -96,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Sync state
+    // Load actual sync states
     chrome.storage.local.get([
         'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
     ], (result) => {
@@ -110,11 +119,21 @@ document.addEventListener('DOMContentLoaded', () => {
         updateLanguage(lang);
     });
 
-    dom.langToggle.addEventListener('click', () => {
-        const target = currentLang === 'EN' ? 'RU' : 'EN';
-        chrome.storage.local.set({ uiLang: target }, () => {
-            updateLanguage(target);
-        });
+    // Event listeners for segment switchers
+    dom.langBtnEN.addEventListener('click', () => {
+        if (currentLang !== 'EN') {
+            chrome.storage.local.set({ uiLang: 'EN' }, () => {
+                updateLanguage('EN');
+            });
+        }
+    });
+
+    dom.langBtnRU.addEventListener('click', () => {
+        if (currentLang !== 'RU') {
+            chrome.storage.local.set({ uiLang: 'RU' }, () => {
+                updateLanguage('RU');
+            });
+        }
     });
 
     dom.engineActive.addEventListener('change', () => {

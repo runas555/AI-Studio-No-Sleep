@@ -46,19 +46,42 @@
             border-radius: 50%;
             box-shadow: 0 0 8px var(--success);
         }
-        .lang-btn {
-            background: none;
+        
+        /* Segmented Language Selector */
+        .lang-selector {
+            display: flex;
+            gap: 4px;
+            background-color: #1e293b;
             border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px;
+        }
+        .lang-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: none;
+            border: none;
             color: var(--text-muted);
-            padding: 2px 6px;
+            padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 11px;
+            font-weight: 600;
+            transition: all 0.2s ease;
         }
-        .lang-btn:hover {
+        .lang-btn.active {
+            background-color: #334155;
             color: var(--text-main);
-            border-color: var(--text-muted);
+            box-shadow: 0 0 4px rgba(59, 130, 246, 0.2);
         }
+        .lang-btn svg {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: block;
+        }
+
         .card {
             background-color: var(--bg-card);
             border: 1px solid var(--border);
@@ -80,7 +103,8 @@
             color: var(--text-muted);
             margin-top: 2px;
         }
-        /* Native Custom Switch */
+        
+        /* Toggle Switch */
         .switch {
             position: relative;
             display: inline-block;
@@ -129,7 +153,34 @@
             <div class="logo-dot"></div>
             <span id="txt-logo">PERSISTENT ENGINE</span>
         </div>
-        <button id="langToggle" class="lang-btn">RU</button>
+        
+        <!-- Segmented Flag Switcher -->
+        <div class="lang-selector">
+            <button id="langBtnEN" class="lang-btn active">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <clipPath id="circleView"><circle cx="50" cy="50" r="50"/></clipPath>
+                    <g clip-path="url(#circleView)">
+                        <rect width="100" height="100" fill="#00247d"/>
+                        <path d="M0,0 L100,100 M100,0 L0,100" stroke="#fff" stroke-width="12"/>
+                        <path d="M0,0 L100,100 M100,0 L0,100" stroke="#cf142b" stroke-width="6"/>
+                        <path d="M50,0 L50,100 M0,50 L100,50" stroke="#fff" stroke-width="20"/>
+                        <path d="M50,0 L50,100 M0,50 L100,50" stroke="#cf142b" stroke-width="12"/>
+                    </g>
+                </svg>
+                <span>EN</span>
+            </button>
+            <button id="langBtnRU" class="lang-btn">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <clipPath id="circleViewRU"><circle cx="50" cy="50" r="50"/></clipPath>
+                    <g clip-path="url(#circleViewRU)">
+                        <rect y="0" width="100" height="33.3" fill="#fff"/>
+                        <rect y="33.3" width="100" height="33.4" fill="#0039a6"/>
+                        <rect y="66.7" width="100" height="33.3" fill="#d52b1e"/>
+                    </g>
+                </svg>
+                <span>RU</span>
+            </button>
+        </div>
     </div>
 
     <!-- Main Engine Activation Toggle -->

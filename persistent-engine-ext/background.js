@@ -13,13 +13,12 @@ chrome.runtime.onInstalled.addListener(() => {
     updateToolbarBadge();
 });
 
-// Force-keep the system process awake using official Chrome Power API
 function requestSystemAwake() {
     try {
         chrome.power.requestKeepAwake('system');
-        console.log('[AI Studio No Sleep] System background process wake-lock engaged.');
+        console.log('[AI Studio No Sleep] System wake-lock engaged.');
     } catch (e) {
-        console.warn('[AI Studio No Sleep] Failed to lock system state:', e);
+        console.warn('[AI Studio No Sleep] Power lock failed:', e);
     }
 }
 
@@ -28,7 +27,7 @@ function broadcastWakeUp() {
         try {
             port.postMessage({ type: 'WAKE_UP_PULSE' });
         } catch (e) {
-            connectedPorts.add(port);
+            connectedPorts.delete(port);
         }
     });
 
@@ -106,6 +105,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     if (request.type === 'TOGGLE_ACTIVE') {
         setTimeout(updateToolbarBadge, 100);
+        sendResponse({ ack: true });
+        return false;
+    }
+    if (request.type === 'SHOW_OS_NOTIFICATION') {
+        chrome.storage.local.get(['uiLang'], (res) => {
+            const title = "AI Studio No Sleep";
+            const message = (res.uiLang || 'RU') === 'RU'
+                ? `Ответ готов! Генерация завершена за ${request.duration}.`
+                : `AI response is ready! Completed in ${request.duration}.`;
+
+            try {
+                chrome.notifications.create('generation_finished', {
+                    type: 'basic',
+                    iconUrl: 'icons/icon128.png',
+                    title: title,
+                    message: message,
+                    priority: 2
+                });
+            } catch (e) {}
+        });
+        sendResponse({ ack: true });
+        return false;
+    }
+    
+    // DYNAMIC TOOLBAR BADGE CHANGER
+    if (request.type === 'SET_BADGE_ON') {
+        chrome.action.setBadgeText({ text: "ON" });
+        chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+        sendResponse({ ack: true });
+        return false;
+    }
+    if (request.type === 'SET_BADGE_CHECKMARK') {
+        chrome.action.setBadgeText({ text: "✓" }); // Unicode green checkmark
+        chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
         sendResponse({ ack: true });
         return false;
     }

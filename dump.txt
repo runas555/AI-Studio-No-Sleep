@@ -1,21 +1,25 @@
 ================================================================================
-PERSISTENT ENGINE - CURRENT IMPLEMENTATION DUMP
-Generated: 2026-06-14T08:20:49.160Z
+AI STUDIO NO SLEEP - COMPLETE VERIFICATION DUMP
 ================================================================================
+Generated: 2026-06-14T09:29:20.139Z
+Scope: Strict aistudio.google.com
 
---- START OF FILE: manifest.json ---
+--- FILE 1: manifest.json ---
 {
     "manifest_version": 3,
-    "name": "Persistent Engine: Tab Lock",
-    "version": "1.1.0",
-    "description": "Keeps AI Studio active and fully prioritized in modern Chromium environments.",
+    "name": "AI Studio No Sleep",
+    "version": "2.0.0",
+    "description": "Prevents Google AI Studio from pausing text generation in background tabs.",
     "permissions": [
         "storage",
         "activeTab",
-        "scripting"
+        "scripting",
+        "tabs",
+        "power",
+        "notifications"
     ],
     "host_permissions": [
-        "<all_urls>"
+        "https://aistudio.google.com/*"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -31,7 +35,7 @@ Generated: 2026-06-14T08:20:49.160Z
     "content_scripts": [
         {
             "matches": [
-                "<all_urls>"
+                "https://aistudio.google.com/*"
             ],
             "js": [
                 "content.js"
@@ -46,15 +50,16 @@ Generated: 2026-06-14T08:20:49.160Z
         "128": "icons/icon128.png"
     }
 }
---- END OF FILE: manifest.json ---
 
---- START OF FILE: content.js ---
+--- FILE 2: content.js (Advanced spoofing + Infrasound 1Hz + Angular scroll + Close Protection) ---
 /**
- * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.2)
- * Clean, CSP-compliant, non-destructive tab lock logic.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.8 - Dynamic Badges & Final Scroll)
+ * Features: Infrasound Priority, Screen Wake Lock, Adaptive Angular Scroll, Delayed Finish Notifications, Accidental Close, Checkmark Badges.
  */
 (function() {
     'use strict';
+
+    injectDOMHook();
 
     let config = {
         engineActive: true,
@@ -69,28 +74,28 @@ Generated: 2026-06-14T08:20:49.160Z
         'preventThrottling', 
         'audioKeepAlive', 
         'activitySimulation', 
-        'heartbeatRate'
+        'heartbeatRate',
+        'uiLang'
     ], (result) => {
         config = { ...config, ...result };
         if (config.engineActive) {
-            initEngine();
+            initEngine(result.uiLang || 'RU');
         }
     });
 
-    function initEngine() {
-        console.log('[PersistentEngine] Initiating safe bypass layers...');
-        injectDOMHook();
+    function initEngine(lang) {
+        console.log('[AI Studio No Sleep] Safety protocols active.');
 
         if (config.audioKeepAlive) {
-            enableAudioPulse();
+            enableInfrasoundPulse();
         }
 
         if (config.activitySimulation) {
             startVirtualInteractionLoop();
         }
 
-        // Establish keep-alive port with background script to prevent tab discard
-        keepAliveConnection();
+        setupLongLivedPort();
+        startGenerationObserver(lang);
     }
 
     function injectDOMHook() {
@@ -100,9 +105,6 @@ Generated: 2026-06-14T08:20:49.160Z
                 (function() {
                     'use strict';
                     
-                    console.log('[PersistentEngine/DOM] Injecting safe API overrides...');
-
-                    // 1. Spoof Document State Properties (Direct Overwrites)
                     Object.defineProperty(document, 'visibilityState', {
                         get: () => 'visible',
                         configurable: true
@@ -115,44 +117,85 @@ Generated: 2026-06-14T08:20:49.160Z
 
                     document.hasFocus = function() { return true; };
 
-                    // 2. Safeguard against direct 'on' property assignments (onblur, onvisibilitychange)
                     const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
                     blockProperties.forEach(prop => {
                         Object.defineProperty(document, prop, {
                             get: () => null,
-                            set: () => console.log('[PersistentEngine] Blocked direct document property:', prop),
+                            set: () => {},
                             configurable: true
                         });
                         Object.defineProperty(window, prop, {
                             get: () => null,
-                            set: () => console.log('[PersistentEngine] Blocked direct window property:', prop),
+                            set: () => {},
                             configurable: true
                         });
                     });
 
-                    // 3. Block propagation of visibility/focus loss events
-                    const interceptedEvents = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
-                    const nativeAddEventListener = EventTarget.prototype.addEventListener;
-                    EventTarget.prototype.addEventListener = function(type, listener, options) {
-                        if (interceptedEvents.includes(type)) {
-                            const dummyListener = function(e) {
-                                e.stopImmediatePropagation();
-                                e.preventDefault();
-                            };
-                            return nativeAddEventListener.call(this, type, dummyListener, options);
-                        }
-                        return nativeAddEventListener.call(this, type, listener, options);
+                    const silentBlocker = function(e) {
+                        e.stopImmediatePropagation();
+                        e.preventDefault();
+                        window.dispatchEvent(new CustomEvent('PERSISTENT_EVENT_BLOCKED'));
                     };
+                    const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
+                    eventsToCatch.forEach(eventName => {
+                        window.addEventListener(eventName, silentBlocker, true);
+                        document.addEventListener(eventName, silentBlocker, true);
+                    });
+
+                    // requestAnimationFrame queue
+                    const activeRafCallbacks = new Map();
+                    let rafIdCounter = 0;
+
+                    const nativerAF = window.requestAnimationFrame;
+                    window.requestAnimationFrame = function(callback) {
+                        const id = ++rafIdCounter;
+                        activeRafCallbacks.set(id, callback);
+                        
+                        nativerAF(function(timestamp) {
+                            if (activeRafCallbacks.has(id)) {
+                                activeRafCallbacks.delete(id);
+                                try { callback(timestamp); } catch(e) {}
+                            }
+                        });
+                        return id;
+                    };
+
+                    const nativeCancelRAF = window.cancelAnimationFrame;
+                    window.cancelAnimationFrame = function(id) {
+                        if (activeRafCallbacks.has(id)) {
+                            activeRafCallbacks.delete(id);
+                        } else {
+                            nativeCancelRAF(id);
+                        }
+                    };
+
+                    window.addEventListener('message', function(event) {
+                        if (event.data && event.data.type === 'FORCE_RENDER_TICK') {
+                            if (activeRafCallbacks.size > 0) {
+                                const now = performance.now();
+                                const callbacks = Array.from(activeRafCallbacks.entries());
+                                activeRafCallbacks.clear();
+                                
+                                callbacks.forEach(function([id, cb]) {
+                                    try { cb(now); } catch(err) {}
+                                });
+                            }
+                        }
+                    });
                 })();
             `;
             (document.head || document.documentElement).appendChild(script);
             script.remove();
         } catch (e) {
-            console.error('[PersistentEngine] DOM injection failed:', e);
+            console.error('[AI Studio No Sleep] DOM injection failed:', e);
         }
+
+        window.addEventListener('PERSISTENT_EVENT_BLOCKED', () => {
+            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+        });
     }
 
-    function enableAudioPulse() {
+    function enableInfrasoundPulse() {
         let audioContext;
         const startAudio = () => {
             if (audioContext) return;
@@ -162,19 +205,16 @@ Generated: 2026-06-14T08:20:49.160Z
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime);
-                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+                osc.frequency.setValueAtTime(1, audioContext.currentTime); 
+                gain.gain.setValueAtTime(0.02, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
                 
-                console.log('[PersistentEngine] Silent priority audio registered.');
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
-            } catch (err) {
-                console.warn('[PersistentEngine] Audio deferred:', err);
-            }
+            } catch (err) {}
         };
         window.addEventListener('click', startAudio, { passive: true });
         window.addEventListener('keydown', startAudio, { passive: true });
@@ -185,13 +225,12 @@ Generated: 2026-06-14T08:20:49.160Z
         setInterval(() => {
             if (!config.engineActive) return;
 
-            // Emulate minor micro-movements to reset idle limits
             const moveEvent = new MouseEvent('mousemove', {
                 bubbles: true,
                 cancelable: true,
                 view: window,
-                clientX: Math.floor(Math.random() * window.innerWidth),
-                clientY: Math.floor(Math.random() * window.innerHeight)
+                clientX: 10,
+                clientY: 10
             });
             window.dispatchEvent(moveEvent);
 
@@ -201,18 +240,207 @@ Generated: 2026-06-14T08:20:49.160Z
         }, interval);
     }
 
-    function keepAliveConnection() {
-        // Keeps background worker awake and informs browser the tab is actively communicating
-        setInterval(() => {
-            chrome.runtime.sendMessage({ type: 'KEEP_ALIVE' }, () => {
-                if (chrome.runtime.lastError) return;
+    function setupLongLivedPort() {
+        const port = chrome.runtime.connect({ name: "KeepAlivePort" });
+        
+        port.onMessage.addListener((msg) => {
+            if (msg.type === 'WAKE_UP_PULSE') {
+                window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
+                if (Math.random() > 0.8) {
+                    chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+                }
+            }
+        });
+
+        port.onDisconnect.addListener(() => {
+            setTimeout(setupLongLivedPort, 1000);
+        });
+    }
+
+    let scrollInterval = null;
+    function startAutoScroll() {
+        if (scrollInterval) clearInterval(scrollInterval);
+        scrollInterval = setInterval(() => {
+            performAdaptiveScroll();
+        }, 800);
+    }
+
+    function stopAutoScroll() {
+        if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+        }
+    }
+
+    function performAdaptiveScroll() {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+        const elements = document.querySelectorAll('div, section, main, md-block');
+        elements.forEach(el => {
+            const overflow = window.getComputedStyle(el).overflowY;
+            if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
+                el.scrollTop = el.scrollHeight;
+            }
+        });
+
+        const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
+        customHandles.forEach(handle => {
+            let parent = handle.parentElement;
+            while (parent && parent !== document.body) {
+                const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
+                innerViewports.forEach(vp => {
+                    if (vp.scrollHeight > vp.clientHeight) {
+                        vp.scrollTop = vp.scrollHeight;
+                    }
+                });
+                parent = parent.parentElement;
+            }
+        });
+    }
+
+    let wakeLockInstance = null;
+    async function requestWakeLock() {
+        if (wakeLockInstance) return;
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLockInstance = await navigator.wakeLock.request('screen');
+            }
+        } catch (e) {}
+    }
+
+    function releaseWakeLock() {
+        if (wakeLockInstance) {
+            wakeLockInstance.release().then(() => {
+                wakeLockInstance = null;
             });
-        }, 20000);
+        }
+    }
+
+    let stopwatchInterval = null;
+    let stopwatchSeconds = 0;
+    let flashTitleInterval = null;
+    let originalTitle = document.title || "Google AI Studio";
+
+    function startStopwatch() {
+        stopwatchSeconds = 0;
+        if (stopwatchInterval) clearInterval(stopwatchInterval);
+
+        stopwatchInterval = setInterval(() => {
+            stopwatchSeconds++;
+            const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
+            const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
+            document.title = `⚡ [${minutes}:${seconds}] Generating... | AI Studio`;
+        }, 1000);
+    }
+
+    function stopStopwatch() {
+        if (stopwatchInterval) {
+            clearInterval(stopwatchInterval);
+            stopwatchInterval = null;
+        }
+    }
+
+    function triggerFinishNotifications(lang) {
+        const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
+        const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
+
+        chrome.runtime.sendMessage({ 
+            type: 'SHOW_OS_NOTIFICATION', 
+            duration: `${minutes}:${seconds}` 
+        });
+
+        startTabTitleFlashing(lang);
+    }
+
+    function startTabTitleFlashing(lang) {
+        if (flashTitleInterval) clearInterval(flashTitleInterval);
+        
+        let toggle = false;
+        const state1 = lang === 'RU' ? '✅ Готово! | AI Studio' : '✅ DONE! | AI Studio';
+        const state2 = lang === 'RU' ? '★ Ответ готов! ★' : '★ AI Answer Ready! ★';
+
+        flashTitleInterval = setInterval(() => {
+            document.title = toggle ? state1 : state2;
+            toggle = !toggle;
+        }, 1000);
+    }
+
+    function stopTabTitleFlashing() {
+        if (flashTitleInterval) {
+            clearInterval(flashTitleInterval);
+            flashTitleInterval = null;
+        }
+        document.title = originalTitle;
+    }
+
+    window.addEventListener('focus', () => {
+        stopTabTitleFlashing();
+    });
+
+    const preventTabClose = (e) => {
+        e.preventDefault();
+        e.returnValue = 'AI Studio is actively generating text in the background. Are you sure you want to exit?';
+        return e.returnValue;
+    };
+
+    function startGenerationObserver(lang) {
+        let isGenerating = false;
+
+        setTimeout(() => {
+            if (document.title && !document.title.includes('Generating')) {
+                originalTitle = document.title;
+            }
+        }, 2000);
+
+        const observer = new MutationObserver(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const hasStopButton = buttons.some(btn => {
+                const text = btn.innerText ? btn.innerText.toLowerCase() : '';
+                return text.includes('stop') || text.includes('cancel');
+            });
+
+            if (hasStopButton && !isGenerating) {
+                isGenerating = true;
+                
+                stopTabTitleFlashing();
+                requestWakeLock();
+                startAutoScroll();
+                startStopwatch();
+                
+                // Set Badge to active "ON" when streaming starts
+                chrome.runtime.sendMessage({ type: 'SET_BADGE_ON' });
+                
+                window.addEventListener('beforeunload', preventTabClose, { capture: true });
+                
+            } else if (!hasStopButton && isGenerating) {
+                isGenerating = false;
+                
+                releaseWakeLock();
+                stopAutoScroll();
+                
+                performAdaptiveScroll();
+                
+                setTimeout(() => {
+                    performAdaptiveScroll();
+                    stopStopwatch();
+                    triggerFinishNotifications(lang);
+                    
+                    // Set Toolbar Badge to Checkmark "✓" on final scroll completion
+                    chrome.runtime.sendMessage({ type: 'SET_BADGE_CHECKMARK' });
+                }, 150);
+                
+                window.removeEventListener('beforeunload', preventTabClose, { capture: true });
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 })();
---- END OF FILE: content.js ---
 
---- START OF FILE: background.js ---
+--- FILE 3: background.js (KeepAlivePorts + chrome.power System Lock + Dynamic Badge) ---
+let activePulseInterval = null;
+const connectedPorts = new Set();
+
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set({
         engineActive: true,
@@ -222,7 +450,84 @@ chrome.runtime.onInstalled.addListener(() => {
         heartbeatRate: 15,
         savedCyclesCount: 0
     });
+    updateToolbarBadge();
 });
+
+function requestSystemAwake() {
+    try {
+        chrome.power.requestKeepAwake('system');
+        console.log('[AI Studio No Sleep] System wake-lock engaged.');
+    } catch (e) {
+        console.warn('[AI Studio No Sleep] Power lock failed:', e);
+    }
+}
+
+function broadcastWakeUp() {
+    connectedPorts.forEach(port => {
+        try {
+            port.postMessage({ type: 'WAKE_UP_PULSE' });
+        } catch (e) {
+            connectedPorts.delete(port);
+        }
+    });
+
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && tab.url.includes('aistudio.google.com')) {
+                chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
+                    if (chrome.runtime.lastError) return;
+                });
+            }
+        });
+    });
+}
+
+function startGlobalPulse() {
+    requestSystemAwake();
+    if (activePulseInterval) clearInterval(activePulseInterval);
+    activePulseInterval = setInterval(broadcastWakeUp, 500);
+}
+
+function updateToolbarBadge() {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        const active = res.engineActive !== false;
+        if (active) {
+            chrome.action.setBadgeText({ text: "ON" });
+            chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+        } else {
+            chrome.action.setBadgeText({ text: "OFF" });
+            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+        }
+    });
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "KeepAlivePort") {
+        connectedPorts.add(port);
+        if (!activePulseInterval) startGlobalPulse();
+
+        port.onDisconnect.addListener(() => {
+            connectedPorts.delete(port);
+            if (connectedPorts.size === 0 && activePulseInterval) {
+                clearInterval(activePulseInterval);
+                activePulseInterval = null;
+                try { chrome.power.releaseKeepAwake(); } catch (e) {}
+            }
+        });
+    }
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        if (res.engineActive !== false) {
+            chrome.tabs.update(activeInfo.tabId, { autoDiscardable: false }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }
+    });
+});
+
+startGlobalPulse();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SIGNAL_PREVENT_PAUSE') {
@@ -233,74 +538,133 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true; 
     }
-});
---- END OF FILE: background.js ---
+    if (request.type === 'KEEP_ALIVE') {
+        if (!activePulseInterval) startGlobalPulse();
+        sendResponse({ alive: true });
+        return false;
+    }
+    if (request.type === 'TOGGLE_ACTIVE') {
+        setTimeout(updateToolbarBadge, 100);
+        sendResponse({ ack: true });
+        return false;
+    }
+    if (request.type === 'SHOW_OS_NOTIFICATION') {
+        chrome.storage.local.get(['uiLang'], (res) => {
+            const title = "AI Studio No Sleep";
+            const message = (res.uiLang || 'RU') === 'RU'
+                ? `Ответ готов! Генерация завершена за ${request.duration}.`
+                : `AI response is ready! Completed in ${request.duration}.`;
 
---- START OF FILE: popup.html ---
+            try {
+                chrome.notifications.create('generation_finished', {
+                    type: 'basic',
+                    iconUrl: 'icons/icon128.png',
+                    title: title,
+                    message: message,
+                    priority: 2
+                });
+            } catch (e) {}
+        });
+        sendResponse({ ack: true });
+        return false;
+    }
+    
+    // DYNAMIC TOOLBAR BADGE CHANGER
+    if (request.type === 'SET_BADGE_ON') {
+        chrome.action.setBadgeText({ text: "ON" });
+        chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+        sendResponse({ ack: true });
+        return false;
+    }
+    if (request.type === 'SET_BADGE_CHECKMARK') {
+        chrome.action.setBadgeText({ text: "✓" }); // Unicode green checkmark
+        chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
+        sendResponse({ ack: true });
+        return false;
+    }
+});
+
+--- FILE 4: popup.html (Minimalist UX with SVG Flag segmenters & Neon Pulse bars) ---
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Persistent Engine Panel</title>
+    <title>AI Studio No Sleep</title>
     <style>
         :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
+            --bg-main: #0b1329;
+            --bg-card: #1c2541;
             --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --text-muted: #8da9c4;
             --accent: #3b82f6;
             --success: #10b981;
             --danger: #ef4444;
-            --border: #334155;
+            --border: #1e293b;
         }
         body {
-            width: 340px;
+            width: 320px;
             font-family: system-ui, -apple-system, sans-serif;
             background-color: var(--bg-main);
             color: var(--text-main);
             margin: 0;
             padding: 16px;
+            user-select: none;
         }
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
             padding-bottom: 12px;
             margin-bottom: 16px;
         }
         .logo {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-weight: 800;
-            font-size: 15px;
-            letter-spacing: -0.5px;
+            gap: 6px;
+            font-weight: 700;
+            font-size: 14px;
         }
         .logo-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             background-color: var(--success);
             border-radius: 50%;
-            box-shadow: 0 0 8px var(--success);
+            box-shadow: 0 0 6px var(--success);
+        }
+        .lang-selector {
+            display: flex;
+            gap: 2px;
+            background-color: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            padding: 2px;
         }
         .lang-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
             background: none;
-            border: 1px solid var(--border);
+            border: none;
             color: var(--text-muted);
             padding: 2px 6px;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 10px;
+            font-weight: 600;
         }
-        .lang-btn:hover {
+        .lang-btn.active {
+            background-color: var(--bg-card);
             color: var(--text-main);
-            border-color: var(--text-muted);
+        }
+        .lang-btn svg {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
         }
         .card {
             background-color: var(--bg-card);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255,255,255,0.05);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
@@ -317,48 +681,138 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .toggle-desc {
             font-size: 10px;
             color: var(--text-muted);
-            margin-top: 2px;
+            margin-top: 3px;
+            line-height: 1.3;
         }
-        /* Native Custom Switch */
         .switch {
             position: relative;
             display: inline-block;
-            width: 40px;
-            height: 20px;
+            width: 36px;
+            height: 18px;
         }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider {
             position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #475569; transition: .2s; border-radius: 20px;
+            background-color: #475569; transition: .2s; border-radius: 18px;
         }
         .slider:before {
-            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+            position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px;
             background-color: white; transition: .2s; border-radius: 50%;
         }
         input:checked + .slider { background-color: var(--success); }
-        input:checked + .slider:before { transform: translateX(20px); }
+        input:checked + .slider:before { transform: translateX(18px); }
 
-        .metrics {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-        .metric-card {
-            background-color: #1a2238;
-            border: 1px solid #2e3b5e;
+        .monitor-card {
+            background-color: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
             border-radius: 8px;
-            padding: 10px;
-            text-align: center;
+            padding: 16px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
         }
-        .metric-title { font-size: 9px; color: var(--text-muted); font-weight: 600; }
-        .metric-value { font-size: 18px; font-weight: 800; color: var(--accent); margin-top: 4px; }
-
-        .footer-note {
+        .monitor-title {
             font-size: 10px;
-            color: #475569;
+            color: var(--text-muted);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .pulse-visualizer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+        .scan-line {
+            position: relative;
+            width: 80%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+        .scan-glow {
+            position: absolute;
+            left: -40%;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--success), transparent);
+        }
+        .equalizer {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 5px;
+            height: 20px;
+        }
+        .equalizer .bar {
+            width: 3px;
+            height: 20%;
+            background-color: #475569;
+            border-radius: 1.5px;
+            transition: background-color 0.3s ease, height 0.3s ease;
+        }
+        .pulse-visualizer.active .scan-glow {
+            animation: scan 1.4s infinite linear;
+        }
+        .pulse-visualizer.active .bar {
+            background-color: var(--success);
+            box-shadow: 0 0 5px var(--success);
+            animation: bounce 0.8s infinite ease-in-out alternate;
+        }
+        .pulse-visualizer.active .bar:nth-child(1) { animation-delay: 0.1s; height: 30%; }
+        .pulse-visualizer.active .bar:nth-child(2) { animation-delay: 0.4s; height: 60%; }
+        .pulse-visualizer.active .bar:nth-child(3) { animation-delay: 0.2s; height: 90%; }
+        .pulse-visualizer.active .bar:nth-child(4) { animation-delay: 0.5s; height: 40%; }
+        .pulse-visualizer.active .bar:nth-child(5) { animation-delay: 0.3s; height: 70%; }
+
+        @keyframes scan {
+            0% { left: -40%; }
+            100% { left: 100%; }
+        }
+        @keyframes bounce {
+            0% { height: 15%; opacity: 0.4; }
+            100% { height: 100%; opacity: 1; }
+        }
+        .status-badge {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: color 0.3s ease;
+        }
+        .stats-text {
+            font-size: 9px;
+            color: rgba(255,255,255,0.2);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .advanced-toggle {
+            display: block;
+            width: 100%;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 11px;
             text-align: center;
-            margin-top: 16px;
+            cursor: pointer;
+            padding: 4px 0;
+            text-decoration: underline;
+        }
+        .advanced-panel {
+            display: none;
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-top: 10px;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .advanced-panel.open {
+            display: flex;
         }
     </style>
 </head>
@@ -366,16 +820,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     <div class="header">
         <div class="logo">
             <div class="logo-dot"></div>
-            <span id="txt-logo">PERSISTENT ENGINE</span>
+            <span id="txt-logo">AI STUDIO NO SLEEP</span>
         </div>
-        <button id="langToggle" class="lang-btn">RU</button>
+        <div class="lang-selector">
+            <button id="langBtnEN" class="lang-btn">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <clipPath id="c1"><circle cx="50" cy="50" r="50"/></clipPath>
+                    <g clip-path="url(#c1)">
+                        <rect width="100" height="100" fill="#00247d"/>
+                        <path d="M0,0 L100,100 M100,0 L0,100" stroke="#fff" stroke-width="12"/>
+                        <path d="M0,0 L100,100 M100,0 L0,100" stroke="#cf142b" stroke-width="6"/>
+                        <path d="M50,0 L50,100 M0,50 L100,50" stroke="#fff" stroke-width="20"/>
+                        <path d="M50,0 L50,100 M0,50 L100,50" stroke="#cf142b" stroke-width="12"/>
+                    </g>
+                </svg>
+                <span>EN</span>
+            </button>
+            <button id="langBtnRU" class="lang-btn active">
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <clipPath id="c2"><circle cx="50" cy="50" r="50"/></clipPath>
+                    <g clip-path="url(#c2)">
+                        <rect y="0" width="100" height="33.3" fill="#fff"/>
+                        <rect y="33.3" width="100" height="33.4" fill="#0039a6"/>
+                        <rect y="66.7" width="100" height="33.3" fill="#d52b1e"/>
+                    </g>
+                </svg>
+                <span>RU</span>
+            </button>
+        </div>
     </div>
 
-    <!-- Main Engine Activation Toggle -->
     <div class="card flex-row">
-        <div>
-            <div id="txt-engine-title" class="toggle-label">Active Simulation Shield</div>
-            <div id="txt-engine-desc" class="toggle-desc">Keeps tab execution active</div>
+        <div style="max-width: 210px;">
+            <div id="txt-engine-title" class="toggle-label">Работа в фоне</div>
+            <div id="txt-engine-desc" class="toggle-desc">Текст продолжит создаваться, даже если вы свернете браузер или перейдете в другую вкладку.</div>
         </div>
         <label class="switch">
             <input type="checkbox" id="engineActive">
@@ -383,115 +861,121 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         </label>
     </div>
 
-    <!-- Telemetry Metrics -->
-    <div class="metrics">
-        <div class="metric-card">
-            <div id="txt-met-prevented" class="metric-title">PREVENTED PAUSES</div>
-            <div id="counterVal" class="metric-value">0</div>
+    <div class="monitor-card">
+        <div id="txt-met-prevented" class="monitor-title">Активность защиты</div>
+        <div id="pulseVisualizer" class="pulse-visualizer active">
+            <div class="scan-line">
+                <div class="scan-glow"></div>
+            </div>
+            <div class="equalizer">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
         </div>
-        <div class="metric-card">
-            <div id="txt-met-status" class="metric-title">ENGINE STATE</div>
-            <div id="statusLabel" class="metric-value" style="font-size: 13px; margin-top: 8px; color: var(--success);">ACTIVE</div>
+        <div id="statusLabel" class="status-badge" style="color: var(--success);">ЗАЩИТА РАБОТАЕТ</div>
+        <div class="stats-text">
+            <span id="txt-cycles-label">Циклы активности:</span> <span id="counterVal">0</span>
         </div>
     </div>
 
-    <!-- Module Settings -->
-    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
-        <div id="txt-modules-header" style="font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">SUB-SYSTEM CONFIGURATION</div>
-        
+    <button id="toggleAdvanced" class="advanced-toggle">Показать дополнительные настройки</button>
+    
+    <div id="advancedPanel" class="advanced-panel">
         <div class="flex-row">
             <div>
-                <div id="txt-mod-throttle-title" class="toggle-label" style="font-size: 12px;">Timer Optimization Bypass</div>
-                <div id="txt-mod-throttle-desc" class="toggle-desc">Forces background worker threads</div>
+                <div id="txt-mod-throttle-title" class="toggle-label" style="font-size: 12px;">Ускорение работы в фоне</div>
+                <div id="txt-mod-throttle-desc" class="toggle-desc">Позволяет тексту генерироваться с обычной скоростью.</div>
             </div>
             <input type="checkbox" id="preventThrottling">
         </div>
-
-        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
+        <div class="flex-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
             <div>
-                <div id="txt-mod-audio-title" class="toggle-label" style="font-size: 12px;">Audio Keep-Alive Loop</div>
-                <div id="txt-mod-audio-desc" class="toggle-desc">Trick Edge from sleeping tab mode</div>
+                <div id="txt-mod-audio-title" class="toggle-label" style="font-size: 12px;">Защита от засыпания вкладки</div>
+                <div id="txt-mod-audio-desc" class="toggle-desc">Не дает браузеру «усыпить» или закрыть фоновую вкладку.</div>
             </div>
             <input type="checkbox" id="audioKeepAlive">
         </div>
-
-        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
+        <div class="flex-row" style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
             <div>
-                <div id="txt-mod-pulse-title" class="toggle-label" style="font-size: 12px;">Random Activity Pulse</div>
-                <div id="txt-mod-pulse-desc" class="toggle-desc">Inject virtual mouse events</div>
+                <div id="txt-mod-pulse-title" class="toggle-label" style="font-size: 12px;">Имитация движений мыши</div>
+                <div id="txt-mod-pulse-desc" class="toggle-desc">Двигает виртуальную мышь для обхода защиты сайтов от бездействия.</div>
             </div>
             <input type="checkbox" id="activitySimulation">
         </div>
     </div>
 
-    <div class="footer-note">
-        Microsoft Edge & Chromium Stable Compatibility Mode
+    <div class="footer-note" id="txt-footer">
+        Совместимо с Microsoft Edge и Google Chrome
     </div>
-
     <script src="popup.js"></script>
 </body>
 </html>
---- END OF FILE: popup.html ---
 
---- START OF FILE: popup.js ---
-/**
- * UI CONTROLLER (With Multi-language support)
- */
-
+--- FILE 5: popup.js (Localization & live animation state triggers) ---
 const LOCALIZATION = {
     EN: {
-        logo: "PERSISTENT ENGINE",
-        engineTitle: "Active Simulation Shield",
-        engineDesc: "Keeps tab execution active",
-        metPrevented: "PREVENTED PAUSES",
-        metStatus: "ENGINE STATE",
-        statusActive: "ACTIVE",
-        statusIdle: "OFFLINE",
-        modulesHeader: "SUB-SYSTEM CONFIGURATION",
-        modThrottleTitle: "Timer Optimization Bypass",
-        modThrottleDesc: "Forces background worker threads",
-        modAudioTitle: "Audio Keep-Alive Loop",
-        modAudioDesc: "Trick Edge from sleeping tab mode",
-        modPulseTitle: "Random Activity Pulse",
-        modPulseDesc: "Inject virtual mouse events"
+        logo: "AI STUDIO NO SLEEP",
+        engineTitle: "Background protection",
+        engineDesc: "Text will keep generating even if you minimize the browser or switch to another tab.",
+        metPrevented: "PROTECTION HEALTH",
+        statusActive: "PROTECTION ACTIVE",
+        statusIdle: "PROTECTION PAUSED",
+        btnShowAdv: "Show extra options",
+        btnHideAdv: "Hide extra options",
+        cyclesLabel: "Activity cycles: ",
+        modThrottleTitle: "Force Background Speed",
+        modThrottleDesc: "Ensure text continues loading at normal speed in the background.",
+        modAudioTitle: "Prevent Tab Sleep Mode",
+        modAudioDesc: "Prevents browser from putting your background tab to sleep.",
+        modPulseTitle: "Imitate Activity",
+        modPulseDesc: "Moves a virtual cursor to bypass site idle detectors.",
+        footer: "Compatible with Microsoft Edge & Google Chrome"
     },
     RU: {
-        logo: "АКТИВНЫЙ РЕЖИМ",
-        engineTitle: "Симуляция активности",
-        engineDesc: "Предотвращает засыпание вкладки",
-        metPrevented: "БЛОКИРОВАНО ПАУЗ",
-        metStatus: "СТАТУС СИСТЕМЫ",
-        statusActive: "АКТИВЕН",
-        statusIdle: "ВЫКЛЮЧЕН",
-        modulesHeader: "КОНФИГУРАЦИЯ СУБМОДУЛЕЙ",
-        modThrottleTitle: "Обход оптимизации таймеров",
-        modThrottleDesc: "Запуск фоновых потоков Web Worker",
-        modAudioTitle: "Аудио Keep-Alive",
-        modAudioDesc: "Обход режима сна в Edge",
-        modPulseTitle: "Импульсы активности",
-        modPulseDesc: "Эмуляция движения мыши"
+        logo: "AI STUDIO NO SLEEP",
+        engineTitle: "Работа в фоне",
+        engineDesc: "Текст продолжит создаваться, даже если вы свернете браузер или перейдете в другую вкладку.",
+        metPrevented: "АКТИВНОСТЬ ЗАЩИТЫ",
+        statusActive: "ЗАЩИТА РАБОТАЕТ",
+        statusIdle: "ЗАЩИТА НА ПАУЗЕ",
+        btnShowAdv: "Показать дополнительные настройки",
+        btnHideAdv: "Скрыть дополнительные настройки",
+        cyclesLabel: "Циклы активности: ",
+        modThrottleTitle: "Ускорение работы в фоне",
+        modThrottleDesc: "Позволяет тексту генерироваться с обычной скоростью в фоне.",
+        modAudioTitle: "Защита от засыпания вкладки",
+        modAudioDesc: "Не дает браузеру переводить фоновую вкладку в режим энергосбережения.",
+        modPulseTitle: "Имитация активности",
+        modPulseDesc: "Двигает виртуальную мышь для обхода защиты сайтов от бездействия.",
+        footer: "Совместимо с Microsoft Edge и Google Chrome"
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    let currentLang = 'EN';
+    let currentLang = 'RU';
 
     const dom = {
-        langToggle: document.getElementById('langToggle'),
+        langBtnEN: document.getElementById('langBtnEN'),
+        langBtnRU: document.getElementById('langBtnRU'),
         logo: document.getElementById('txt-logo'),
         engineTitle: document.getElementById('txt-engine-title'),
         engineDesc: document.getElementById('txt-engine-desc'),
         metPrevented: document.getElementById('txt-met-prevented'),
-        metStatus: document.getElementById('txt-met-status'),
         statusLabel: document.getElementById('statusLabel'),
-        modulesHeader: document.getElementById('txt-modules-header'),
+        cyclesLabel: document.getElementById('txt-cycles-label'),
+        pulseVisualizer: document.getElementById('pulseVisualizer'),
+        toggleAdvanced: document.getElementById('toggleAdvanced'),
+        advancedPanel: document.getElementById('advancedPanel'),
         modThrottleTitle: document.getElementById('txt-mod-throttle-title'),
         modThrottleDesc: document.getElementById('txt-mod-throttle-desc'),
         modAudioTitle: document.getElementById('txt-mod-audio-title'),
         modAudioDesc: document.getElementById('txt-mod-audio-desc'),
         modPulseTitle: document.getElementById('txt-mod-pulse-title'),
         modPulseDesc: document.getElementById('txt-mod-pulse-desc'),
-
+        footer: document.getElementById('txt-footer'),
         engineActive: document.getElementById('engineActive'),
         preventThrottling: document.getElementById('preventThrottling'),
         audioKeepAlive: document.getElementById('audioKeepAlive'),
@@ -501,22 +985,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLanguage(lang) {
         currentLang = lang;
-        dom.langToggle.innerText = lang === 'EN' ? 'RU' : 'EN';
-        
+        if (lang === 'EN') {
+            dom.langBtnEN.classList.add('active');
+            dom.langBtnRU.classList.remove('active');
+        } else {
+            dom.langBtnRU.classList.add('active');
+            dom.langBtnEN.classList.remove('active');
+        }
         const t = LOCALIZATION[lang];
         dom.logo.innerText = t.logo;
         dom.engineTitle.innerText = t.engineTitle;
         dom.engineDesc.innerText = t.engineDesc;
         dom.metPrevented.innerText = t.metPrevented;
-        dom.metStatus.innerText = t.metStatus;
-        dom.modulesHeader.innerText = t.modulesHeader;
+        dom.cyclesLabel.innerText = t.cyclesLabel;
         dom.modThrottleTitle.innerText = t.modThrottleTitle;
         dom.modThrottleDesc.innerText = t.modThrottleDesc;
         dom.modAudioTitle.innerText = t.modAudioTitle;
         dom.modAudioDesc.innerText = t.modAudioDesc;
         dom.modPulseTitle.innerText = t.modPulseTitle;
         dom.modPulseDesc.innerText = t.modPulseDesc;
-
+        dom.footer.innerText = t.footer;
+        const isPanelOpen = dom.advancedPanel.classList.contains('open');
+        dom.toggleAdvanced.innerText = isPanelOpen ? t.btnHideAdv : t.btnShowAdv;
         updateStatusLabel();
     }
 
@@ -526,13 +1016,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isActive) {
             dom.statusLabel.innerText = t.statusActive;
             dom.statusLabel.style.color = 'var(--success)';
+            dom.pulseVisualizer.classList.add('active');
         } else {
             dom.statusLabel.innerText = t.statusIdle;
             dom.statusLabel.style.color = 'var(--danger)';
+            dom.pulseVisualizer.classList.remove('active');
         }
     }
 
-    // Sync state
+    dom.toggleAdvanced.addEventListener('click', () => {
+        const panel = dom.advancedPanel;
+        const isOpen = panel.classList.toggle('open');
+        const t = LOCALIZATION[currentLang];
+        dom.toggleAdvanced.innerText = isOpen ? t.btnHideAdv : t.btnShowAdv;
+    });
+
     chrome.storage.local.get([
         'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
     ], (result) => {
@@ -541,20 +1039,38 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.audioKeepAlive.checked = result.audioKeepAlive !== false;
         dom.activitySimulation.checked = result.activitySimulation !== false;
         dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
-        
-        const lang = result.uiLang || 'EN';
+        const lang = result.uiLang || 'RU';
         updateLanguage(lang);
     });
 
-    dom.langToggle.addEventListener('click', () => {
-        const target = currentLang === 'EN' ? 'RU' : 'EN';
-        chrome.storage.local.set({ uiLang: target }, () => {
-            updateLanguage(target);
-        });
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes.savedCyclesCount) {
+            const newVal = changes.savedCyclesCount.newValue || 0;
+            dom.counterVal.innerText = newVal.toLocaleString();
+        }
+    });
+
+    dom.langBtnEN.addEventListener('click', () => {
+        if (currentLang !== 'EN') {
+            chrome.storage.local.set({ uiLang: 'EN' }, () => {
+                updateLanguage('EN');
+            });
+        }
+    });
+
+    dom.langBtnRU.addEventListener('click', () => {
+        if (currentLang !== 'RU') {
+            chrome.storage.local.set({ uiLang: 'RU' }, () => {
+                updateLanguage('RU');
+            });
+        }
     });
 
     dom.engineActive.addEventListener('change', () => {
-        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, updateStatusLabel);
+        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, () => {
+            updateStatusLabel();
+            chrome.runtime.sendMessage({ type: 'TOGGLE_ACTIVE' });
+        });
     });
 
     dom.preventThrottling.addEventListener('change', () => {
@@ -569,8 +1085,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.set({ activitySimulation: dom.activitySimulation.checked });
     });
 });
---- END OF FILE: popup.js ---
-
 ================================================================================
 END OF DUMP
 ================================================================================

@@ -1,7 +1,3 @@
-/**
- * SIMPLIFIED UI CONTROLLER WITH NEON VISUAL PULSE
- */
-
 const LOCALIZATION = {
     EN: {
         logo: "AI STUDIO NO SLEEP",
@@ -13,7 +9,6 @@ const LOCALIZATION = {
         btnShowAdv: "Show extra options",
         btnHideAdv: "Hide extra options",
         cyclesLabel: "Activity cycles: ",
-        
         modThrottleTitle: "Force Background Speed",
         modThrottleDesc: "Ensure text continues loading at normal speed in the background.",
         modAudioTitle: "Prevent Tab Sleep Mode",
@@ -32,7 +27,6 @@ const LOCALIZATION = {
         btnShowAdv: "Показать дополнительные настройки",
         btnHideAdv: "Скрыть дополнительные настройки",
         cyclesLabel: "Циклы активности: ",
-        
         modThrottleTitle: "Ускорение работы в фоне",
         modThrottleDesc: "Позволяет тексту генерироваться с обычной скоростью в фоне.",
         modAudioTitle: "Защита от засыпания вкладки",
@@ -55,11 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
         metPrevented: document.getElementById('txt-met-prevented'),
         statusLabel: document.getElementById('statusLabel'),
         cyclesLabel: document.getElementById('txt-cycles-label'),
-        
         pulseVisualizer: document.getElementById('pulseVisualizer'),
         toggleAdvanced: document.getElementById('toggleAdvanced'),
         advancedPanel: document.getElementById('advancedPanel'),
-        
         modThrottleTitle: document.getElementById('txt-mod-throttle-title'),
         modThrottleDesc: document.getElementById('txt-mod-throttle-desc'),
         modAudioTitle: document.getElementById('txt-mod-audio-title'),
@@ -67,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modPulseTitle: document.getElementById('txt-mod-pulse-title'),
         modPulseDesc: document.getElementById('txt-mod-pulse-desc'),
         footer: document.getElementById('txt-footer'),
-
         engineActive: document.getElementById('engineActive'),
         preventThrottling: document.getElementById('preventThrottling'),
         audioKeepAlive: document.getElementById('audioKeepAlive'),
@@ -77,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLanguage(lang) {
         currentLang = lang;
-        
         if (lang === 'EN') {
             dom.langBtnEN.classList.add('active');
             dom.langBtnRU.classList.remove('active');
@@ -85,14 +75,12 @@ document.addEventListener('DOMContentLoaded', () => {
             dom.langBtnRU.classList.add('active');
             dom.langBtnEN.classList.remove('active');
         }
-        
         const t = LOCALIZATION[lang];
         dom.logo.innerText = t.logo;
         dom.engineTitle.innerText = t.engineTitle;
         dom.engineDesc.innerText = t.engineDesc;
         dom.metPrevented.innerText = t.metPrevented;
         dom.cyclesLabel.innerText = t.cyclesLabel;
-        
         dom.modThrottleTitle.innerText = t.modThrottleTitle;
         dom.modThrottleDesc.innerText = t.modThrottleDesc;
         dom.modAudioTitle.innerText = t.modAudioTitle;
@@ -100,25 +88,22 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.modPulseTitle.innerText = t.modPulseTitle;
         dom.modPulseDesc.innerText = t.modPulseDesc;
         dom.footer.innerText = t.footer;
-
         const isPanelOpen = dom.advancedPanel.classList.contains('open');
         dom.toggleAdvanced.innerText = isPanelOpen ? t.btnHideAdv : t.btnShowAdv;
-
         updateStatusLabel();
     }
 
     function updateStatusLabel() {
         const isActive = dom.engineActive.checked;
         const t = LOCALIZATION[currentLang];
-        
         if (isActive) {
             dom.statusLabel.innerText = t.statusActive;
             dom.statusLabel.style.color = 'var(--success)';
-            dom.pulseVisualizer.classList.add('active'); // Start neon animations
+            dom.pulseVisualizer.classList.add('active');
         } else {
             dom.statusLabel.innerText = t.statusIdle;
             dom.statusLabel.style.color = 'var(--danger)';
-            dom.pulseVisualizer.classList.remove('active'); // Freeze neon animations
+            dom.pulseVisualizer.classList.remove('active');
         }
     }
 
@@ -129,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.toggleAdvanced.innerText = isOpen ? t.btnHideAdv : t.btnShowAdv;
     });
 
-    // Load initial states
     chrome.storage.local.get([
         'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
     ], (result) => {
@@ -138,12 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.audioKeepAlive.checked = result.audioKeepAlive !== false;
         dom.activitySimulation.checked = result.activitySimulation !== false;
         dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
-        
         const lang = result.uiLang || 'RU';
         updateLanguage(lang);
     });
 
-    // Live update counter
     chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local' && changes.savedCyclesCount) {
             const newVal = changes.savedCyclesCount.newValue || 0;

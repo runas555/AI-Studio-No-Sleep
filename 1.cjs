@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Fixes Angular Custom Scrollbars and re-orders finish sequence.
- * File: patch-angular-scroll.cjs
+ * PATCH SCRIPT: Bypasses Angular CDK Virtual Scroll via event dispatchers.
+ * File: patch-unbreakable-scroll.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -23,11 +23,11 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- UPDATED CONTENT SCRIPT WITH ANGULAR SCROLL DISCOVERY & SEQUENTIAL NOTIFICATIONS ---
-const angularScrollContentJs = `
+// --- UNBREAKABLE SCROLL CONTENT SCRIPT ---
+const unbreakableScrollContentJs = `
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.7 - Angular Scroll & Sequence Fixed)
- * Features: Infrasound Priority, Screen Wake Lock, Adaptive Angular Scroll, Delayed Finish Notifications.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.9 - Unbreakable Scroll)
+ * Features: Infrasound Priority, Screen Wake Lock, Event-Driven Angular CDK Scroll, Delayed Finish Notifications.
  */
 (function() {
     'use strict';
@@ -245,36 +245,54 @@ const angularScrollContentJs = `
         }
     }
 
-    // --- ADAPTIVE ANGULAR & NATIVE SCROLL ENGINE ---
-    // Finds custom Angular scroll viewports and forces scroll position to maximum height
+    // --- ADAPTIVE UNBREAKABLE SCROLL ENGINE ---
+    // Forces coordinates and dispatches native 'scroll' events to trigger Angular CDK digests
     function performAdaptiveScroll() {
-        // 1. Scroll main window
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        // 1. Force native document bottom
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 
-        // 2. Discover and scroll native scrollable elements
-        const elements = document.querySelectorAll('div, section, main, md-block');
-        elements.forEach(el => {
-            const overflow = window.getComputedStyle(el).overflowY;
-            if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
-                el.scrollTop = el.scrollHeight;
+        // 2. Scan for all potential viewports (including Angular CDK specific selectors)
+        const targets = document.querySelectorAll('cdk-virtual-scroll-viewport, .scrollbar-handle, .ng-scrollbar-handle, [class*="viewport"], [class*="scroll"], div, section, main');
+        
+        targets.forEach(el => {
+            if (el.scrollHeight > el.clientHeight) {
+                // Set absolute scroll height limit
+                el.scrollTop = el.scrollHeight + 5000;
+                
+                // CRITICAL FIX: Dispatch native scroll event so Angular Virtual Scroll intercepts it!
+                el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
             }
         });
 
-        // 3. TARGET ANGULAR CUSTOM SCROLLBARS (Finds scrollbar-handle and traces back to viewport)
+        // 3. Fallback trace through custom handles parents
         const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
         customHandles.forEach(handle => {
             let parent = handle.parentElement;
-            // Traverse up to find the wrapped viewport container
             while (parent && parent !== document.body) {
                 const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
                 innerViewports.forEach(vp => {
                     if (vp.scrollHeight > vp.clientHeight) {
-                        vp.scrollTop = vp.scrollHeight;
+                        vp.scrollTop = vp.scrollHeight + 5000;
+                        vp.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
                     }
                 });
                 parent = parent.parentElement;
             }
         });
+
+        // 4. LOW-LEVEL KEYBOARD EMULATION: Emulate physical 'End' key on active element
+        try {
+            const activeEl = document.activeElement || document.body;
+            const endEvent = new KeyboardEvent('keydown', {
+                key: 'End',
+                code: 'End',
+                keyCode: 35,
+                which: 35,
+                bubbles: true,
+                cancelable: true
+            });
+            activeEl.dispatchEvent(endEvent);
+        } catch (e) {}
     }
 
     let wakeLockInstance = null;
@@ -323,13 +341,11 @@ const angularScrollContentJs = `
         const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
         const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
 
-        // Trigger OS notification banner
         chrome.runtime.sendMessage({ 
             type: 'SHOW_OS_NOTIFICATION', 
-            duration: \`\${minutes}:\${seconds}\` 
+            duration: \`\${minutes}:\default\${seconds}\` 
         });
 
-        // Trigger browser tab flashing
         startTabTitleFlashing(lang);
     }
 
@@ -388,6 +404,8 @@ const angularScrollContentJs = `
                 startAutoScroll();
                 startStopwatch();
                 
+                chrome.runtime.sendMessage({ type: 'SET_BADGE_ON' });
+                
                 window.addEventListener('beforeunload', preventTabClose, { capture: true });
                 
             } else if (!hasStopButton && isGenerating) {
@@ -396,15 +414,20 @@ const angularScrollContentJs = `
                 releaseWakeLock();
                 stopAutoScroll();
                 
-                // 1. Force guaranteed scroll to bottom on custom scroll containers immediately
+                // MICRO-LOOP HARD COORD RESET (Fires 3 times to sync late Angular rendering chunks)
                 performAdaptiveScroll();
                 
-                // 2. Delay notifications for 150ms to let the DOM settle and finish rendering the scroll position
+                setTimeout(() => { performAdaptiveScroll(); }, 60);
+                setTimeout(() => { performAdaptiveScroll(); }, 120);
+                
+                // Finalize only after the final render ticks have landed and synced
                 setTimeout(() => {
-                    performAdaptiveScroll(); // Double-check final coordinate lock
+                    performAdaptiveScroll(); // One last check
                     stopStopwatch();
                     triggerFinishNotifications(lang);
-                }, 150);
+                    
+                    chrome.runtime.sendMessage({ type: 'SET_BADGE_CHECKMARK' });
+                }, 220);
                 
                 window.removeEventListener('beforeunload', preventTabClose, { capture: true });
             }
@@ -422,11 +445,11 @@ function run() {
     }
 
     try {
-        fs.writeFileSync(contentFile, angularScrollContentJs.trim() + '\n', 'utf8');
-        log('Successfully resolved Angular Custom Scrollbar bypass and re-ordered finish notifications.', 'success');
+        fs.writeFileSync(contentFile, unbreakableScrollContentJs.trim() + '\n', 'utf8');
+        log('Successfully applied Unbreakable Event-driven Scroll Engine (Angular CDK virtual viewport safe).', 'success');
         log('Please reload the extension inside edge://extensions/.', 'info');
     } catch (e) {
-        log(`Failed to patch angular scroll: ${e.message}`, 'error');
+        log(`Failed to patch unbreakable scroll: ${e.message}`, 'error');
     }
 }
 

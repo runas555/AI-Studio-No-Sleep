@@ -1,11 +1,11 @@
 /**
- * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.3 - Patched)
- * Features: Immediate Sync DOM injection, Capture-phase event suppression.
+ * PERSISTENT ENGINE - CONTENT SCRIPT (v1.4 - Minimized Fixed)
+ * Bypasses Chrome requestAnimationFrame throttling and minimized freezes.
  */
 (function() {
     'use strict';
 
-    // FIRST DEFENSE LINE: Inject hook synchronously at document_start to avoid race conditions
+    // Synchronous DOM Hook to intercept visibility and rAF
     injectDOMHook();
 
     let config = {
@@ -16,7 +16,6 @@
         heartbeatRate: 15
     };
 
-    // Load user configurations asynchronously for sub-modules
     chrome.storage.local.get([
         'engineActive', 
         'preventThrottling', 
@@ -31,7 +30,7 @@
     });
 
     function initEngine() {
-        console.log('[PersistentEngine] Initializing secondary keep-alive modules...');
+        console.log('[PersistentEngine] Keep-alive systems active.');
 
         if (config.audioKeepAlive) {
             enableAudioPulse();
@@ -41,7 +40,8 @@
             startVirtualInteractionLoop();
         }
 
-        keepAliveConnection();
+        // Connect and listen for background external wake-up ticks
+        setupBackgroundListener();
     }
 
     function injectDOMHook() {
@@ -51,9 +51,9 @@
                 (function() {
                     'use strict';
                     
-                    console.log('[PersistentEngine/DOM] Force Overwriting state properties...');
+                    console.log('[PersistentEngine/DOM] Injecting rAF and visibility overrides...');
 
-                    // 1. Immutable Property Spoofing
+                    // 1. Visibility state override
                     Object.defineProperty(document, 'visibilityState', {
                         get: () => 'visible',
                         configurable: true
@@ -81,23 +81,66 @@
                         });
                     });
 
-                    // 3. CAPTURING PHASE SUPPRESSION (No prototype pollution of addEventListener)
+                    // 3. Capturing phase event blocker
                     const silentBlocker = function(e) {
                         e.stopImmediatePropagation();
                         e.preventDefault();
                     };
-
                     const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
                     eventsToCatch.forEach(eventName => {
                         window.addEventListener(eventName, silentBlocker, true);
                         document.addEventListener(eventName, silentBlocker, true);
+                    });
+
+                    // 4. requestAnimationFrame (rAF) BUSTER
+                    // Stores page render callbacks to force-run them when window is minimized
+                    const activeRafCallbacks = new Map();
+                    let rafIdCounter = 0;
+
+                    const nativerAF = window.requestAnimationFrame;
+                    window.requestAnimationFrame = function(callback) {
+                        const id = ++rafIdCounter;
+                        activeRafCallbacks.set(id, callback);
+                        
+                        // Let native rAF try to process normally if window is open
+                        nativerAF(function(timestamp) {
+                            if (activeRafCallbacks.has(id)) {
+                                activeRafCallbacks.delete(id);
+                                try { callback(timestamp); } catch(e) {}
+                            }
+                        });
+                        return id;
+                    };
+
+                    const nativeCancelRAF = window.cancelAnimationFrame;
+                    window.cancelAnimationFrame = function(id) {
+                        if (activeRafCallbacks.has(id)) {
+                            activeRafCallbacks.delete(id);
+                        } else {
+                            nativeCancelRAF(id);
+                        }
+                    };
+
+                    // External trigger to flush rendering queue when minimized
+                    window.addEventListener('message', function(event) {
+                        if (event.data && event.data.type === 'FORCE_RENDER_TICK') {
+                            if (activeRafCallbacks.size > 0) {
+                                const now = performance.now();
+                                const callbacks = Array.from(activeRafCallbacks.entries());
+                                activeRafCallbacks.clear();
+                                
+                                callbacks.forEach(function([id, cb]) {
+                                    try { cb(now); } catch(err) {}
+                                });
+                            }
+                        }
                     });
                 })();
             `;
             (document.head || document.documentElement).appendChild(script);
             script.remove();
         } catch (e) {
-            console.error('[PersistentEngine] Synchronous DOM injection failed:', e);
+            console.error('[PersistentEngine] DOM injection failed:', e);
         }
     }
 
@@ -118,12 +161,9 @@
                 gain.connect(audioContext.destination);
                 osc.start();
                 
-                console.log('[PersistentEngine] Audio keeps alive.');
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
-            } catch (err) {
-                console.warn('[PersistentEngine] Audio waiting:', err);
-            }
+            } catch (err) {}
         };
         window.addEventListener('click', startAudio, { passive: true });
         window.addEventListener('keydown', startAudio, { passive: true });
@@ -138,22 +178,20 @@
                 bubbles: true,
                 cancelable: true,
                 view: window,
-                clientX: Math.floor(Math.random() * window.innerWidth),
-                clientY: Math.floor(Math.random() * window.innerHeight)
+                clientX: 10,
+                clientY: 10
             });
             window.dispatchEvent(moveEvent);
-
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
-                if (chrome.runtime.lastError) return;
-            });
         }, interval);
     }
 
-    function keepAliveConnection() {
-        setInterval(() => {
-            chrome.runtime.sendMessage({ type: 'KEEP_ALIVE' }, () => {
-                if (chrome.runtime.lastError) return;
-            });
-        }, 20000);
+    function setupBackgroundListener() {
+        // Listen for fast background wake-up pulses (active even when minimized)
+        chrome.runtime.onMessage.addListener((message) => {
+            if (message && message.type === 'WAKE_UP_PULSE') {
+                // Post event to MAIN world to force flush the rAF render queue
+                window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
+            }
+        });
     }
 })();

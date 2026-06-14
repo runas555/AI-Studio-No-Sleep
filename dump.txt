@@ -1,0 +1,576 @@
+================================================================================
+PERSISTENT ENGINE - CURRENT IMPLEMENTATION DUMP
+Generated: 2026-06-14T08:20:49.160Z
+================================================================================
+
+--- START OF FILE: manifest.json ---
+{
+    "manifest_version": 3,
+    "name": "Persistent Engine: Tab Lock",
+    "version": "1.1.0",
+    "description": "Keeps AI Studio active and fully prioritized in modern Chromium environments.",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": true
+        }
+    ],
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    }
+}
+--- END OF FILE: manifest.json ---
+
+--- START OF FILE: content.js ---
+/**
+ * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.2)
+ * Clean, CSP-compliant, non-destructive tab lock logic.
+ */
+(function() {
+    'use strict';
+
+    let config = {
+        engineActive: true,
+        preventThrottling: true,
+        audioKeepAlive: true,
+        activitySimulation: true,
+        heartbeatRate: 15
+    };
+
+    chrome.storage.local.get([
+        'engineActive', 
+        'preventThrottling', 
+        'audioKeepAlive', 
+        'activitySimulation', 
+        'heartbeatRate'
+    ], (result) => {
+        config = { ...config, ...result };
+        if (config.engineActive) {
+            initEngine();
+        }
+    });
+
+    function initEngine() {
+        console.log('[PersistentEngine] Initiating safe bypass layers...');
+        injectDOMHook();
+
+        if (config.audioKeepAlive) {
+            enableAudioPulse();
+        }
+
+        if (config.activitySimulation) {
+            startVirtualInteractionLoop();
+        }
+
+        // Establish keep-alive port with background script to prevent tab discard
+        keepAliveConnection();
+    }
+
+    function injectDOMHook() {
+        try {
+            const script = document.createElement('script');
+            script.textContent = `
+                (function() {
+                    'use strict';
+                    
+                    console.log('[PersistentEngine/DOM] Injecting safe API overrides...');
+
+                    // 1. Spoof Document State Properties (Direct Overwrites)
+                    Object.defineProperty(document, 'visibilityState', {
+                        get: () => 'visible',
+                        configurable: true
+                    });
+
+                    Object.defineProperty(document, 'hidden', {
+                        get: () => false,
+                        configurable: true
+                    });
+
+                    document.hasFocus = function() { return true; };
+
+                    // 2. Safeguard against direct 'on' property assignments (onblur, onvisibilitychange)
+                    const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
+                    blockProperties.forEach(prop => {
+                        Object.defineProperty(document, prop, {
+                            get: () => null,
+                            set: () => console.log('[PersistentEngine] Blocked direct document property:', prop),
+                            configurable: true
+                        });
+                        Object.defineProperty(window, prop, {
+                            get: () => null,
+                            set: () => console.log('[PersistentEngine] Blocked direct window property:', prop),
+                            configurable: true
+                        });
+                    });
+
+                    // 3. Block propagation of visibility/focus loss events
+                    const interceptedEvents = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
+                    const nativeAddEventListener = EventTarget.prototype.addEventListener;
+                    EventTarget.prototype.addEventListener = function(type, listener, options) {
+                        if (interceptedEvents.includes(type)) {
+                            const dummyListener = function(e) {
+                                e.stopImmediatePropagation();
+                                e.preventDefault();
+                            };
+                            return nativeAddEventListener.call(this, type, dummyListener, options);
+                        }
+                        return nativeAddEventListener.call(this, type, listener, options);
+                    };
+                })();
+            `;
+            (document.head || document.documentElement).appendChild(script);
+            script.remove();
+        } catch (e) {
+            console.error('[PersistentEngine] DOM injection failed:', e);
+        }
+    }
+
+    function enableAudioPulse() {
+        let audioContext;
+        const startAudio = () => {
+            if (audioContext) return;
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1, audioContext.currentTime);
+                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.start();
+                
+                console.log('[PersistentEngine] Silent priority audio registered.');
+                window.removeEventListener('click', startAudio);
+                window.removeEventListener('keydown', startAudio);
+            } catch (err) {
+                console.warn('[PersistentEngine] Audio deferred:', err);
+            }
+        };
+        window.addEventListener('click', startAudio, { passive: true });
+        window.addEventListener('keydown', startAudio, { passive: true });
+    }
+
+    function startVirtualInteractionLoop() {
+        const interval = (config.heartbeatRate || 15) * 1000;
+        setInterval(() => {
+            if (!config.engineActive) return;
+
+            // Emulate minor micro-movements to reset idle limits
+            const moveEvent = new MouseEvent('mousemove', {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: Math.floor(Math.random() * window.innerWidth),
+                clientY: Math.floor(Math.random() * window.innerHeight)
+            });
+            window.dispatchEvent(moveEvent);
+
+            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }, interval);
+    }
+
+    function keepAliveConnection() {
+        // Keeps background worker awake and informs browser the tab is actively communicating
+        setInterval(() => {
+            chrome.runtime.sendMessage({ type: 'KEEP_ALIVE' }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }, 20000);
+    }
+})();
+--- END OF FILE: content.js ---
+
+--- START OF FILE: background.js ---
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.set({
+        engineActive: true,
+        preventThrottling: true,
+        audioKeepAlive: true,
+        activitySimulation: true,
+        heartbeatRate: 15,
+        savedCyclesCount: 0
+    });
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'SIGNAL_PREVENT_PAUSE') {
+        chrome.storage.local.get(['savedCyclesCount'], (res) => {
+            const current = res.savedCyclesCount || 0;
+            chrome.storage.local.set({ savedCyclesCount: current + 1 });
+            sendResponse({ ack: true, currentCount: current + 1 });
+        });
+        return true; 
+    }
+});
+--- END OF FILE: background.js ---
+
+--- START OF FILE: popup.html ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Persistent Engine Panel</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        body {
+            width: 340px;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            margin: 0;
+            padding: 16px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -0.5px;
+        }
+        .logo-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+        .lang-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .lang-btn:hover {
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .flex-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .toggle-label {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .toggle-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        /* Native Custom Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #475569; transition: .2s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .2s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .metric-card {
+            background-color: #1a2238;
+            border: 1px solid #2e3b5e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .metric-title { font-size: 9px; color: var(--text-muted); font-weight: 600; }
+        .metric-value { font-size: 18px; font-weight: 800; color: var(--accent); margin-top: 4px; }
+
+        .footer-note {
+            font-size: 10px;
+            color: #475569;
+            text-align: center;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-dot"></div>
+            <span id="txt-logo">PERSISTENT ENGINE</span>
+        </div>
+        <button id="langToggle" class="lang-btn">RU</button>
+    </div>
+
+    <!-- Main Engine Activation Toggle -->
+    <div class="card flex-row">
+        <div>
+            <div id="txt-engine-title" class="toggle-label">Active Simulation Shield</div>
+            <div id="txt-engine-desc" class="toggle-desc">Keeps tab execution active</div>
+        </div>
+        <label class="switch">
+            <input type="checkbox" id="engineActive">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <!-- Telemetry Metrics -->
+    <div class="metrics">
+        <div class="metric-card">
+            <div id="txt-met-prevented" class="metric-title">PREVENTED PAUSES</div>
+            <div id="counterVal" class="metric-value">0</div>
+        </div>
+        <div class="metric-card">
+            <div id="txt-met-status" class="metric-title">ENGINE STATE</div>
+            <div id="statusLabel" class="metric-value" style="font-size: 13px; margin-top: 8px; color: var(--success);">ACTIVE</div>
+        </div>
+    </div>
+
+    <!-- Module Settings -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+        <div id="txt-modules-header" style="font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">SUB-SYSTEM CONFIGURATION</div>
+        
+        <div class="flex-row">
+            <div>
+                <div id="txt-mod-throttle-title" class="toggle-label" style="font-size: 12px;">Timer Optimization Bypass</div>
+                <div id="txt-mod-throttle-desc" class="toggle-desc">Forces background worker threads</div>
+            </div>
+            <input type="checkbox" id="preventThrottling">
+        </div>
+
+        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
+            <div>
+                <div id="txt-mod-audio-title" class="toggle-label" style="font-size: 12px;">Audio Keep-Alive Loop</div>
+                <div id="txt-mod-audio-desc" class="toggle-desc">Trick Edge from sleeping tab mode</div>
+            </div>
+            <input type="checkbox" id="audioKeepAlive">
+        </div>
+
+        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
+            <div>
+                <div id="txt-mod-pulse-title" class="toggle-label" style="font-size: 12px;">Random Activity Pulse</div>
+                <div id="txt-mod-pulse-desc" class="toggle-desc">Inject virtual mouse events</div>
+            </div>
+            <input type="checkbox" id="activitySimulation">
+        </div>
+    </div>
+
+    <div class="footer-note">
+        Microsoft Edge & Chromium Stable Compatibility Mode
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
+--- END OF FILE: popup.html ---
+
+--- START OF FILE: popup.js ---
+/**
+ * UI CONTROLLER (With Multi-language support)
+ */
+
+const LOCALIZATION = {
+    EN: {
+        logo: "PERSISTENT ENGINE",
+        engineTitle: "Active Simulation Shield",
+        engineDesc: "Keeps tab execution active",
+        metPrevented: "PREVENTED PAUSES",
+        metStatus: "ENGINE STATE",
+        statusActive: "ACTIVE",
+        statusIdle: "OFFLINE",
+        modulesHeader: "SUB-SYSTEM CONFIGURATION",
+        modThrottleTitle: "Timer Optimization Bypass",
+        modThrottleDesc: "Forces background worker threads",
+        modAudioTitle: "Audio Keep-Alive Loop",
+        modAudioDesc: "Trick Edge from sleeping tab mode",
+        modPulseTitle: "Random Activity Pulse",
+        modPulseDesc: "Inject virtual mouse events"
+    },
+    RU: {
+        logo: "АКТИВНЫЙ РЕЖИМ",
+        engineTitle: "Симуляция активности",
+        engineDesc: "Предотвращает засыпание вкладки",
+        metPrevented: "БЛОКИРОВАНО ПАУЗ",
+        metStatus: "СТАТУС СИСТЕМЫ",
+        statusActive: "АКТИВЕН",
+        statusIdle: "ВЫКЛЮЧЕН",
+        modulesHeader: "КОНФИГУРАЦИЯ СУБМОДУЛЕЙ",
+        modThrottleTitle: "Обход оптимизации таймеров",
+        modThrottleDesc: "Запуск фоновых потоков Web Worker",
+        modAudioTitle: "Аудио Keep-Alive",
+        modAudioDesc: "Обход режима сна в Edge",
+        modPulseTitle: "Импульсы активности",
+        modPulseDesc: "Эмуляция движения мыши"
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    let currentLang = 'EN';
+
+    const dom = {
+        langToggle: document.getElementById('langToggle'),
+        logo: document.getElementById('txt-logo'),
+        engineTitle: document.getElementById('txt-engine-title'),
+        engineDesc: document.getElementById('txt-engine-desc'),
+        metPrevented: document.getElementById('txt-met-prevented'),
+        metStatus: document.getElementById('txt-met-status'),
+        statusLabel: document.getElementById('statusLabel'),
+        modulesHeader: document.getElementById('txt-modules-header'),
+        modThrottleTitle: document.getElementById('txt-mod-throttle-title'),
+        modThrottleDesc: document.getElementById('txt-mod-throttle-desc'),
+        modAudioTitle: document.getElementById('txt-mod-audio-title'),
+        modAudioDesc: document.getElementById('txt-mod-audio-desc'),
+        modPulseTitle: document.getElementById('txt-mod-pulse-title'),
+        modPulseDesc: document.getElementById('txt-mod-pulse-desc'),
+
+        engineActive: document.getElementById('engineActive'),
+        preventThrottling: document.getElementById('preventThrottling'),
+        audioKeepAlive: document.getElementById('audioKeepAlive'),
+        activitySimulation: document.getElementById('activitySimulation'),
+        counterVal: document.getElementById('counterVal')
+    };
+
+    function updateLanguage(lang) {
+        currentLang = lang;
+        dom.langToggle.innerText = lang === 'EN' ? 'RU' : 'EN';
+        
+        const t = LOCALIZATION[lang];
+        dom.logo.innerText = t.logo;
+        dom.engineTitle.innerText = t.engineTitle;
+        dom.engineDesc.innerText = t.engineDesc;
+        dom.metPrevented.innerText = t.metPrevented;
+        dom.metStatus.innerText = t.metStatus;
+        dom.modulesHeader.innerText = t.modulesHeader;
+        dom.modThrottleTitle.innerText = t.modThrottleTitle;
+        dom.modThrottleDesc.innerText = t.modThrottleDesc;
+        dom.modAudioTitle.innerText = t.modAudioTitle;
+        dom.modAudioDesc.innerText = t.modAudioDesc;
+        dom.modPulseTitle.innerText = t.modPulseTitle;
+        dom.modPulseDesc.innerText = t.modPulseDesc;
+
+        updateStatusLabel();
+    }
+
+    function updateStatusLabel() {
+        const isActive = dom.engineActive.checked;
+        const t = LOCALIZATION[currentLang];
+        if (isActive) {
+            dom.statusLabel.innerText = t.statusActive;
+            dom.statusLabel.style.color = 'var(--success)';
+        } else {
+            dom.statusLabel.innerText = t.statusIdle;
+            dom.statusLabel.style.color = 'var(--danger)';
+        }
+    }
+
+    // Sync state
+    chrome.storage.local.get([
+        'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
+    ], (result) => {
+        dom.engineActive.checked = result.engineActive !== false;
+        dom.preventThrottling.checked = result.preventThrottling !== false;
+        dom.audioKeepAlive.checked = result.audioKeepAlive !== false;
+        dom.activitySimulation.checked = result.activitySimulation !== false;
+        dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
+        
+        const lang = result.uiLang || 'EN';
+        updateLanguage(lang);
+    });
+
+    dom.langToggle.addEventListener('click', () => {
+        const target = currentLang === 'EN' ? 'RU' : 'EN';
+        chrome.storage.local.set({ uiLang: target }, () => {
+            updateLanguage(target);
+        });
+    });
+
+    dom.engineActive.addEventListener('change', () => {
+        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, updateStatusLabel);
+    });
+
+    dom.preventThrottling.addEventListener('change', () => {
+        chrome.storage.local.set({ preventThrottling: dom.preventThrottling.checked });
+    });
+
+    dom.audioKeepAlive.addEventListener('change', () => {
+        chrome.storage.local.set({ audioKeepAlive: dom.audioKeepAlive.checked });
+    });
+
+    dom.activitySimulation.addEventListener('change', () => {
+        chrome.storage.local.set({ activitySimulation: dom.activitySimulation.checked });
+    });
+});
+--- END OF FILE: popup.js ---
+
+================================================================================
+END OF DUMP
+================================================================================

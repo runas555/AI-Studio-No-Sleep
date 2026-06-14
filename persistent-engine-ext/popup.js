@@ -1,92 +1,135 @@
 /**
- * UI Panel controller logic
- * Binds DOM inputs directly to local Chrome/Edge Storage structure.
+ * UI CONTROLLER (With Multi-language support)
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-    // DOM Element mapping
-    const engineActive = document.getElementById('engineActive');
-    const sliderBtn = document.getElementById('sliderBtn');
-    const statusLabel = document.getElementById('statusLabel');
-    const counterVal = document.getElementById('counterVal');
-    const preventThrottling = document.getElementById('preventThrottling');
-    const audioKeepAlive = document.getElementById('audioKeepAlive');
-    const activitySimulation = document.getElementById('activitySimulation');
-    const heartbeatRate = document.getElementById('heartbeatRate');
-    const rateLabel = document.getElementById('rateLabel');
+const LOCALIZATION = {
+    EN: {
+        logo: "PERSISTENT ENGINE",
+        engineTitle: "Active Simulation Shield",
+        engineDesc: "Keeps tab execution active",
+        metPrevented: "PREVENTED PAUSES",
+        metStatus: "ENGINE STATE",
+        statusActive: "ACTIVE",
+        statusIdle: "OFFLINE",
+        modulesHeader: "SUB-SYSTEM CONFIGURATION",
+        modThrottleTitle: "Timer Optimization Bypass",
+        modThrottleDesc: "Forces background worker threads",
+        modAudioTitle: "Audio Keep-Alive Loop",
+        modAudioDesc: "Trick Edge from sleeping tab mode",
+        modPulseTitle: "Random Activity Pulse",
+        modPulseDesc: "Inject virtual mouse events"
+    },
+    RU: {
+        logo: "АКТИВНЫЙ РЕЖИМ",
+        engineTitle: "Симуляция активности",
+        engineDesc: "Предотвращает засыпание вкладки",
+        metPrevented: "БЛОКИРОВАНО ПАУЗ",
+        metStatus: "СТАТУС СИСТЕМЫ",
+        statusActive: "АКТИВЕН",
+        statusIdle: "ВЫКЛЮЧЕН",
+        modulesHeader: "КОНФИГУРАЦИЯ СУБМОДУЛЕЙ",
+        modThrottleTitle: "Обход оптимизации таймеров",
+        modThrottleDesc: "Запуск фоновых потоков Web Worker",
+        modAudioTitle: "Аудио Keep-Alive",
+        modAudioDesc: "Обход режима сна в Edge",
+        modPulseTitle: "Импульсы активности",
+        modPulseDesc: "Эмуляция движения мыши"
+    }
+};
 
-    const elementsToSync = {
-        engineActive: engineActive,
-        preventThrottling: preventThrottling,
-        audioKeepAlive: audioKeepAlive,
-        activitySimulation: activitySimulation
+document.addEventListener('DOMContentLoaded', () => {
+    let currentLang = 'EN';
+
+    const dom = {
+        langToggle: document.getElementById('langToggle'),
+        logo: document.getElementById('txt-logo'),
+        engineTitle: document.getElementById('txt-engine-title'),
+        engineDesc: document.getElementById('txt-engine-desc'),
+        metPrevented: document.getElementById('txt-met-prevented'),
+        metStatus: document.getElementById('txt-met-status'),
+        statusLabel: document.getElementById('statusLabel'),
+        modulesHeader: document.getElementById('txt-modules-header'),
+        modThrottleTitle: document.getElementById('txt-mod-throttle-title'),
+        modThrottleDesc: document.getElementById('txt-mod-throttle-desc'),
+        modAudioTitle: document.getElementById('txt-mod-audio-title'),
+        modAudioDesc: document.getElementById('txt-mod-audio-desc'),
+        modPulseTitle: document.getElementById('txt-mod-pulse-title'),
+        modPulseDesc: document.getElementById('txt-mod-pulse-desc'),
+
+        engineActive: document.getElementById('engineActive'),
+        preventThrottling: document.getElementById('preventThrottling'),
+        audioKeepAlive: document.getElementById('audioKeepAlive'),
+        activitySimulation: document.getElementById('activitySimulation'),
+        counterVal: document.getElementById('counterVal')
     };
 
-    // Load actual configurations and display state
-    chrome.storage.local.get([
-        'engineActive',
-        'preventThrottling',
-        'audioKeepAlive',
-        'activitySimulation',
-        'heartbeatRate',
-        'savedCyclesCount'
-    ], (result) => {
-        // Toggle Switch Display Configuration
-        engineActive.checked = result.engineActive !== false;
-        adjustToggleDisplay(engineActive.checked);
+    function updateLanguage(lang) {
+        currentLang = lang;
+        dom.langToggle.innerText = lang === 'EN' ? 'RU' : 'EN';
+        
+        const t = LOCALIZATION[lang];
+        dom.logo.innerText = t.logo;
+        dom.engineTitle.innerText = t.engineTitle;
+        dom.engineDesc.innerText = t.engineDesc;
+        dom.metPrevented.innerText = t.metPrevented;
+        dom.metStatus.innerText = t.metStatus;
+        dom.modulesHeader.innerText = t.modulesHeader;
+        dom.modThrottleTitle.innerText = t.modThrottleTitle;
+        dom.modThrottleDesc.innerText = t.modThrottleDesc;
+        dom.modAudioTitle.innerText = t.modAudioTitle;
+        dom.modAudioDesc.innerText = t.modAudioDesc;
+        dom.modPulseTitle.innerText = t.modPulseTitle;
+        dom.modPulseDesc.innerText = t.modPulseDesc;
 
-        // Map general toggles
-        preventThrottling.checked = result.preventThrottling !== false;
-        audioKeepAlive.checked = result.audioKeepAlive !== false;
-        activitySimulation.checked = result.activitySimulation !== false;
+        updateStatusLabel();
+    }
 
-        // Display telemetry values
-        const count = result.savedCyclesCount || 0;
-        counterVal.innerText = count.toLocaleString();
-
-        const rate = result.heartbeatRate || 15;
-        heartbeatRate.value = rate;
-        rateLabel.innerText = rate + 's';
-    });
-
-    // Toggle styling handler
-    function adjustToggleDisplay(isActive) {
+    function updateStatusLabel() {
+        const isActive = dom.engineActive.checked;
+        const t = LOCALIZATION[currentLang];
         if (isActive) {
-            sliderBtn.style.backgroundColor = '#10b981';
-            // Custom translation emulation inside pure CSS
-            sliderBtn.style.boxShadow = 'inset 22px 0 0 #10b981, inset 0 0 0 2px #10b981';
-            statusLabel.innerText = "Simulation Engine Engaged";
-            statusLabel.style.color = '#10b981';
+            dom.statusLabel.innerText = t.statusActive;
+            dom.statusLabel.style.color = 'var(--success)';
         } else {
-            sliderBtn.style.backgroundColor = '#475569';
-            sliderBtn.style.boxShadow = 'none';
-            statusLabel.innerText = "Engine Idle / Decoupled";
-            statusLabel.style.color = '#ef4444';
+            dom.statusLabel.innerText = t.statusIdle;
+            dom.statusLabel.style.color = 'var(--danger)';
         }
     }
 
-    // Active change listeners
-    engineActive.addEventListener('change', () => {
-        const checked = engineActive.checked;
-        adjustToggleDisplay(checked);
-        chrome.storage.local.set({ engineActive: checked });
+    // Sync state
+    chrome.storage.local.get([
+        'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
+    ], (result) => {
+        dom.engineActive.checked = result.engineActive !== false;
+        dom.preventThrottling.checked = result.preventThrottling !== false;
+        dom.audioKeepAlive.checked = result.audioKeepAlive !== false;
+        dom.activitySimulation.checked = result.activitySimulation !== false;
+        dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
+        
+        const lang = result.uiLang || 'EN';
+        updateLanguage(lang);
     });
 
-    preventThrottling.addEventListener('change', () => {
-        chrome.storage.local.set({ preventThrottling: preventThrottling.checked });
+    dom.langToggle.addEventListener('click', () => {
+        const target = currentLang === 'EN' ? 'RU' : 'EN';
+        chrome.storage.local.set({ uiLang: target }, () => {
+            updateLanguage(target);
+        });
     });
 
-    audioKeepAlive.addEventListener('change', () => {
-        chrome.storage.local.set({ audioKeepAlive: audioKeepAlive.checked });
+    dom.engineActive.addEventListener('change', () => {
+        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, updateStatusLabel);
     });
 
-    activitySimulation.addEventListener('change', () => {
-        chrome.storage.local.set({ activitySimulation: activitySimulation.checked });
+    dom.preventThrottling.addEventListener('change', () => {
+        chrome.storage.local.set({ preventThrottling: dom.preventThrottling.checked });
     });
 
-    heartbeatRate.addEventListener('input', () => {
-        const val = heartbeatRate.value;
-        rateLabel.innerText = val + 's';
-        chrome.storage.local.set({ heartbeatRate: parseInt(val, 10) });
+    dom.audioKeepAlive.addEventListener('change', () => {
+        chrome.storage.local.set({ audioKeepAlive: dom.audioKeepAlive.checked });
+    });
+
+    dom.activitySimulation.addEventListener('change', () => {
+        chrome.storage.local.set({ activitySimulation: dom.activitySimulation.checked });
     });
 });

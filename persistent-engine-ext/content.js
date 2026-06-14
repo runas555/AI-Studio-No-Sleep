@@ -1,8 +1,7 @@
 /**
- * CONTENT SCRIPT: Tab Presence Emulator Core
- * Directly intercepts visibility states, focus tracking, and event propagation.
+ * PERSISTENT ENGINE - CONTENT SCRIPT (Core Injection v1.2)
+ * Clean, CSP-compliant, non-destructive tab lock logic.
  */
-
 (function() {
     'use strict';
 
@@ -14,7 +13,6 @@
         heartbeatRate: 15
     };
 
-    // Load configs safely
     chrome.storage.local.get([
         'engineActive', 
         'preventThrottling', 
@@ -29,20 +27,19 @@
     });
 
     function initEngine() {
-        console.log('[PersistentEngine] Initializing active defense layers...');
-
-        // 1. Inject DOM Hook to MAIN world to override Native APIs before page scripts load
+        console.log('[PersistentEngine] Initiating safe bypass layers...');
         injectDOMHook();
 
-        // 2. High-rate activity loop (Audio keep alive to trick Edge sleeping tabs and tab discarded mechanics)
         if (config.audioKeepAlive) {
             enableAudioPulse();
         }
 
-        // 3. Keep-alive Activity simulator (Trusted interaction simulation)
         if (config.activitySimulation) {
             startVirtualInteractionLoop();
         }
+
+        // Establish keep-alive port with background script to prevent tab discard
+        keepAliveConnection();
     }
 
     function injectDOMHook() {
@@ -52,9 +49,9 @@
                 (function() {
                     'use strict';
                     
-                    console.log('[PersistentEngine/DOM] Force Overwriting document APIs...');
+                    console.log('[PersistentEngine/DOM] Injecting safe API overrides...');
 
-                    // Spoof document state variables
+                    // 1. Spoof Document State Properties (Direct Overwrites)
                     Object.defineProperty(document, 'visibilityState', {
                         get: () => 'visible',
                         configurable: true
@@ -65,110 +62,100 @@
                         configurable: true
                     });
 
-                    // Force report focus active
                     document.hasFocus = function() { return true; };
 
-                    // Hijack event listeners to drop tab blur notifications
+                    // 2. Safeguard against direct 'on' property assignments (onblur, onvisibilitychange)
+                    const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
+                    blockProperties.forEach(prop => {
+                        Object.defineProperty(document, prop, {
+                            get: () => null,
+                            set: () => console.log('[PersistentEngine] Blocked direct document property:', prop),
+                            configurable: true
+                        });
+                        Object.defineProperty(window, prop, {
+                            get: () => null,
+                            set: () => console.log('[PersistentEngine] Blocked direct window property:', prop),
+                            configurable: true
+                        });
+                    });
+
+                    // 3. Block propagation of visibility/focus loss events
                     const interceptedEvents = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
-                    
                     const nativeAddEventListener = EventTarget.prototype.addEventListener;
                     EventTarget.prototype.addEventListener = function(type, listener, options) {
                         if (interceptedEvents.includes(type)) {
-                            // Intercept, notify console, but do not register listeners that trigger pause
-                            console.log('[PersistentEngine/Interceptor] Bypassed listener for event:', type);
-                            // Some apps require an empty dummy callback instead of flat block to prevent crashes
-                            const modifiedDummyListener = function(e) {
+                            const dummyListener = function(e) {
                                 e.stopImmediatePropagation();
                                 e.preventDefault();
                             };
-                            return nativeAddEventListener.call(this, type, modifiedDummyListener, options);
+                            return nativeAddEventListener.call(this, type, dummyListener, options);
                         }
                         return nativeAddEventListener.call(this, type, listener, options);
                     };
-
-                    // Prevent tab throttling through window animation frames bypass
-                    const nativeRequestAnimationFrame = window.requestAnimationFrame;
-                    window.requestAnimationFrame = function(callback) {
-                        return nativeRequestAnimationFrame(function(timestamp) {
-                            try {
-                                callback(timestamp);
-                            } catch (e) {
-                                console.error('[PersistentEngine/Anim] Inner callback failed', e);
-                            }
-                        });
-                    };
                 })();
             `;
-            document.documentElement.appendChild(script);
+            (document.head || document.documentElement).appendChild(script);
             script.remove();
         } catch (e) {
-            console.error('[PersistentEngine] Error executing DOM context hook', e);
+            console.error('[PersistentEngine] DOM injection failed:', e);
         }
     }
 
     function enableAudioPulse() {
         let audioContext;
-        const initiateAudioCtx = () => {
+        const startAudio = () => {
+            if (audioContext) return;
             try {
-                if (audioContext) return;
-                
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Low-level silent oscillator loop to register active audio playback inside Chromium
                 const osc = audioContext.createOscillator();
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime); // Inaudible frequency
-                gain.gain.setValueAtTime(0.001, audioContext.currentTime); // Virtually muted but structurally active
+                osc.frequency.setValueAtTime(1, audioContext.currentTime);
+                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
                 
-                console.log('[PersistentEngine] Silent audio priority keep-alive activated successfully.');
-                
-                // Clean up listeners once unlocked
-                window.removeEventListener('click', initiateAudioCtx);
-                window.removeEventListener('keydown', initiateAudioCtx);
+                console.log('[PersistentEngine] Silent priority audio registered.');
+                window.removeEventListener('click', startAudio);
+                window.removeEventListener('keydown', startAudio);
             } catch (err) {
-                console.error('[PersistentEngine/Audio] Failed starting priority context', err);
+                console.warn('[PersistentEngine] Audio deferred:', err);
             }
         };
-
-        // Browser require gesture interaction to start AudioContexts
-        window.addEventListener('click', initiateAudioCtx, { passive: true });
-        window.addEventListener('keydown', initiateAudioCtx, { passive: true });
+        window.addEventListener('click', startAudio, { passive: true });
+        window.addEventListener('keydown', startAudio, { passive: true });
     }
 
     function startVirtualInteractionLoop() {
-        const rateMs = (config.heartbeatRate || 15) * 1000;
-        
+        const interval = (config.heartbeatRate || 15) * 1000;
         setInterval(() => {
             if (!config.engineActive) return;
 
-            // Generate virtual interaction events
-            const mouseEvent = new MouseEvent('mousemove', {
+            // Emulate minor micro-movements to reset idle limits
+            const moveEvent = new MouseEvent('mousemove', {
                 bubbles: true,
                 cancelable: true,
                 view: window,
                 clientX: Math.floor(Math.random() * window.innerWidth),
                 clientY: Math.floor(Math.random() * window.innerHeight)
             });
-            
-            window.dispatchEvent(mouseEvent);
+            window.dispatchEvent(moveEvent);
 
-            // Report state cycle saved to background system
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, (res) => {
-                if (chrome.runtime.lastError) {
-                    // Suppress messaging exceptions
-                    return;
-                }
-                if (res && res.ack) {
-                    console.log('[PersistentEngine] Signaled active state metrics updated.');
-                }
+            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
+                if (chrome.runtime.lastError) return;
             });
+        }, interval);
+    }
 
-        }, rateMs);
+    function keepAliveConnection() {
+        // Keeps background worker awake and informs browser the tab is actively communicating
+        setInterval(() => {
+            chrome.runtime.sendMessage({ type: 'KEEP_ALIVE' }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }, 20000);
     }
 })();

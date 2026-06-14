@@ -5,104 +5,190 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Persistent Engine Panel</title>
     <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
         body {
-            width: 380px;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            width: 340px;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
             margin: 0;
             padding: 16px;
         }
-        .accent-glow {
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
         }
-        .header-logo {
-            background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 15px;
+            letter-spacing: -0.5px;
+        }
+        .logo-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+        .lang-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .lang-btn:hover {
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .flex-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .toggle-label {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .toggle-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        /* Native Custom Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #475569; transition: .2s; border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+            background-color: white; transition: .2s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .metric-card {
+            background-color: #1a2238;
+            border: 1px solid #2e3b5e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .metric-title { font-size: 9px; color: var(--text-muted); font-weight: 600; }
+        .metric-value { font-size: 18px; font-weight: 800; color: var(--accent); margin-top: 4px; }
+
+        .footer-note {
+            font-size: 10px;
+            color: #475569;
+            text-align: center;
+            margin-top: 16px;
         }
     </style>
 </head>
-<body class="accent-glow">
-    <!-- Header Block -->
-    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 12px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 8px #10b981;"></div>
-            <span class="header-logo" style="font-size: 16px; font-weight: 800; letter-spacing: -0.5px;">PERSISTENT ENGINE</span>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-dot"></div>
+            <span id="txt-logo">PERSISTENT ENGINE</span>
         </div>
-        <span style="font-size: 11px; color: #64748b; background-color: #1e293b; padding: 2px 6px; border-radius: 4px; border: 1px solid #334155;">v1.0.0</span>
+        <button id="langToggle" class="lang-btn">RU</button>
     </div>
 
-    <!-- Active status indicator panel -->
-    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Active Security Layer</div>
-                <div id="statusLabel" style="font-size: 13px; color: #10b981; font-weight: 600; margin-top: 2px;">Simulation Engine Engaged</div>
-            </div>
-            <div>
-                <label style="position: relative; display: inline-block; width: 44px; height: 22px;">
-                    <input type="checkbox" id="engineActive" style="opacity: 0; width: 0; height: 0;">
-                    <span id="sliderBtn" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #475569; transition: .3s; border-radius: 34px;"></span>
-                </label>
-            </div>
+    <!-- Main Engine Activation Toggle -->
+    <div class="card flex-row">
+        <div>
+            <div id="txt-engine-title" class="toggle-label">Active Simulation Shield</div>
+            <div id="txt-engine-desc" class="toggle-desc">Keeps tab execution active</div>
         </div>
+        <label class="switch">
+            <input type="checkbox" id="engineActive">
+            <span class="slider"></span>
+        </label>
     </div>
 
-    <!-- Metrics telemetry visualization -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
-        <div style="background-color: #1a2238; border: 1px solid #2e3b5e; border-radius: 8px; padding: 10px; text-align: center;">
-            <div style="font-size: 10px; color: #94a3b8; font-weight: 500;">PREVENTED SLEEPS</div>
-            <div id="counterVal" style="font-size: 20px; font-weight: 800; color: #3b82f6; margin-top: 4px;">0</div>
+    <!-- Telemetry Metrics -->
+    <div class="metrics">
+        <div class="metric-card">
+            <div id="txt-met-prevented" class="metric-title">PREVENTED PAUSES</div>
+            <div id="counterVal" class="metric-value">0</div>
         </div>
-        <div style="background-color: #1a2238; border: 1px solid #2e3b5e; border-radius: 8px; padding: 10px; text-align: center;">
-            <div style="font-size: 10px; color: #94a3b8; font-weight: 500;">STATUS TYPE</div>
-            <div style="font-size: 14px; font-weight: 700; color: #10b981; margin-top: 8px;">STABLE</div>
+        <div class="metric-card">
+            <div id="txt-met-status" class="metric-title">ENGINE STATE</div>
+            <div id="statusLabel" class="metric-value" style="font-size: 13px; margin-top: 8px; color: var(--success);">ACTIVE</div>
         </div>
     </div>
 
-    <!-- Parameter Config Fields -->
-    <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">Advanced Modules</div>
+    <!-- Module Settings -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+        <div id="txt-modules-header" style="font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">SUB-SYSTEM CONFIGURATION</div>
         
-        <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div class="flex-row">
             <div>
-                <div style="font-size: 12px; font-weight: 600; color: #f1f5f9;">Suppress Memory Release</div>
-                <div style="font-size: 10px; color: #64748b;">Prevents OS thread pausing</div>
+                <div id="txt-mod-throttle-title" class="toggle-label" style="font-size: 12px;">Timer Optimization Bypass</div>
+                <div id="txt-mod-throttle-desc" class="toggle-desc">Forces background worker threads</div>
             </div>
             <input type="checkbox" id="preventThrottling">
         </div>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #334155; padding-top: 10px;">
+        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
             <div>
-                <div style="font-size: 12px; font-weight: 600; color: #f1f5f9;">Audio-context Priority</div>
-                <div style="font-size: 10px; color: #64748b;">Prevents sleeping tab optimization</div>
+                <div id="txt-mod-audio-title" class="toggle-label" style="font-size: 12px;">Audio Keep-Alive Loop</div>
+                <div id="txt-mod-audio-desc" class="toggle-desc">Trick Edge from sleeping tab mode</div>
             </div>
             <input type="checkbox" id="audioKeepAlive">
         </div>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #334155; padding-top: 10px;">
+        <div class="flex-row" style="border-top: 1px solid var(--border); padding-top: 8px;">
             <div>
-                <div style="font-size: 12px; font-weight: 600; color: #f1f5f9;">Virtual Activity Pulse</div>
-                <div style="font-size: 10px; color: #64748b;">Generates randomized synthetic events</div>
+                <div id="txt-mod-pulse-title" class="toggle-label" style="font-size: 12px;">Random Activity Pulse</div>
+                <div id="txt-mod-pulse-desc" class="toggle-desc">Inject virtual mouse events</div>
             </div>
             <input type="checkbox" id="activitySimulation">
         </div>
-
-        <div style="border-top: 1px solid #334155; padding-top: 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <span style="font-size: 12px; font-weight: 600; color: #f1f5f9;">Telemetry Interval</span>
-                <span id="rateLabel" style="font-size: 11px; color: #3b82f6; font-weight: 700;">15s</span>
-            </div>
-            <input type="range" id="heartbeatRate" min="5" max="60" value="15" style="width: 100%; cursor: pointer;">
-        </div>
     </div>
 
-    <!-- Active domain diagnostics bar -->
-    <div style="background-color: #0c1020; border: 1px solid #1e293b; border-radius: 6px; padding: 10px;">
-        <span style="font-size: 10px; color: #475569; display: block; text-align: center;">Designed for Edge & Chromium-based engines</span>
+    <div class="footer-note">
+        Microsoft Edge & Chromium Stable Compatibility Mode
     </div>
-    
+
     <script src="popup.js"></script>
 </body>
 </html>

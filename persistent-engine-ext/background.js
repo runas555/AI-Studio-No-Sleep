@@ -1,8 +1,3 @@
-/**
- * BACKGROUND SERVICE WORKER
- * Coordinates persistent configurations and keeps system components synced.
- */
-
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set({
         engineActive: true,
@@ -12,10 +7,8 @@ chrome.runtime.onInstalled.addListener(() => {
         heartbeatRate: 15,
         savedCyclesCount: 0
     });
-    console.log('[PersistentEngine] Service Worker installed and default configurations generated.');
 });
 
-// Sync message interface for diagnostic events
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.type === 'SIGNAL_PREVENT_PAUSE') {
         chrome.storage.local.get(['savedCyclesCount'], (res) => {

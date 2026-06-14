@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "Persistent Engine: Tab Lock",
-    "version": "1.0.0",
-    "description": "Forces tabs to remain visual, active, and fully optimized in modern Chromium environments.",
+    "version": "1.1.0",
+    "description": "Keeps AI Studio active and fully prioritized in modern Chromium environments.",
     "permissions": [
         "storage",
         "activeTab",

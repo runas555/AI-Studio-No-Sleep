@@ -1,4 +1,5 @@
 let activePulseInterval = null;
+const connectedPorts = new Set();
 
 chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.local.set({
@@ -12,48 +13,63 @@ chrome.runtime.onInstalled.addListener(() => {
     updateToolbarBadge();
 });
 
-// High-frequency tick initiator
-function startGlobalPulse() {
-    if (activePulseInterval) clearInterval(activePulseInterval);
-    
-    activePulseInterval = setInterval(() => {
-        chrome.storage.local.get(['engineActive'], (res) => {
-            if (res.engineActive !== false) {
-                chrome.tabs.query({}, (tabs) => {
-                    tabs.forEach(tab => {
-                        if (tab.url && tab.url.startsWith('http')) {
-                            // Send wake-up triggers
-                            chrome.tabs.sendMessage(tab.id, { type: 'WAKE_UP_PULSE' }, () => {
-                                if (chrome.runtime.lastError) return;
-                            });
+// Broadcast wake up pulse over active ports
+function broadcastWakeUp() {
+    connectedPorts.forEach(port => {
+        try {
+            port.postMessage({ type: 'WAKE_UP_PULSE' });
+        } catch (e) {
+            connectedPorts.delete(port);
+        }
+    });
 
-                            // CRITICAL EDGE FIX: Prevent Tab Discarding (sleeping tabs mode) on active pages
-                            chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
-                                if (chrome.runtime.lastError) return;
-                            });
-                        }
-                    });
+    // Enforce anti-discard flag on all tabs
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+            if (tab.url && tab.url.includes('aistudio.google.com')) {
+                chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
+                    if (chrome.runtime.lastError) return;
                 });
             }
         });
-    }, 500);
+    });
 }
 
-// Controls visual feedback Badge in Edge toolbar
+function startGlobalPulse() {
+    if (activePulseInterval) clearInterval(activePulseInterval);
+    activePulseInterval = setInterval(broadcastWakeUp, 500);
+}
+
 function updateToolbarBadge() {
     chrome.storage.local.get(['engineActive'], (res) => {
         const active = res.engineActive !== false;
         if (active) {
             chrome.action.setBadgeText({ text: "ON" });
-            chrome.action.setBadgeBackgroundColor({ color: "#10b981" }); // Emerald Green
+            chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
         } else {
             chrome.action.setBadgeText({ text: "OFF" });
-            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" }); // Red
+            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
         }
     });
 }
 
-// Listen for tab switching to enforce non-discarding state dynamically
+// Persistent Long-lived ports hub
+chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === "KeepAlivePort") {
+        connectedPorts.add(port);
+        
+        if (!activePulseInterval) startGlobalPulse();
+
+        port.onDisconnect.addListener(() => {
+            connectedPorts.delete(port);
+            if (connectedPorts.size === 0 && activePulseInterval) {
+                clearInterval(activePulseInterval);
+                activePulseInterval = null;
+            }
+        });
+    }
+});
+
 chrome.tabs.onActivated.addListener((activeInfo) => {
     chrome.storage.local.get(['engineActive'], (res) => {
         if (res.engineActive !== false) {
@@ -83,9 +99,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.type === 'TOGGLE_ACTIVE') {
-        setTimeout(() => {
-            updateToolbarBadge();
-        }, 100);
+        setTimeout(updateToolbarBadge, 100);
         sendResponse({ ack: true });
         return false;
     }

@@ -1,11 +1,10 @@
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.6)
- * Specifically optimized for aistudio.google.com
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.7)
+ * Strictly targeted to aistudio.google.com with active finish chime.
  */
 (function() {
     'use strict';
 
-    // Synchronous DOM Hook to intercept visibility and rAF
     injectDOMHook();
 
     let config = {
@@ -31,7 +30,7 @@
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Active protection layer engaged.');
+        console.log('[AI Studio No Sleep] Engagement layers initialized.');
 
         if (config.audioKeepAlive) {
             enableAudioPulse();
@@ -41,10 +40,13 @@
             startVirtualInteractionLoop();
         }
 
-        setupBackgroundListener();
+        // Establish long-lived port connection to prevent Service Worker sleep
+        setupLongLivedPort();
         
-        // Render beautiful non-intrusive indicator in the bottom-right corner of AI Studio
         createOnPageIndicator(lang);
+        
+        // Start watching for generation completion
+        startGenerationObserver();
     }
 
     function injectDOMHook() {
@@ -91,7 +93,7 @@
                         document.addEventListener(eventName, silentBlocker, true);
                     });
 
-                    // requestAnimationFrame Bypass
+                    // requestAnimationFrame queue
                     const activeRafCallbacks = new Map();
                     let rafIdCounter = 0;
 
@@ -184,18 +186,26 @@
         }, interval);
     }
 
-    function setupBackgroundListener() {
-        chrome.runtime.onMessage.addListener((message) => {
-            if (message && message.type === 'WAKE_UP_PULSE') {
+    // Long-lived port to keep background worker 100% active
+    function setupLongLivedPort() {
+        const port = chrome.runtime.connect({ name: "KeepAlivePort" });
+        
+        // Listen for pulses driven by background
+        port.onMessage.addListener((msg) => {
+            if (msg.type === 'WAKE_UP_PULSE') {
                 window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
                 if (Math.random() > 0.8) {
                     chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
                 }
             }
         });
+
+        port.onDisconnect.addListener(() => {
+            console.log('[AI Studio No Sleep] Port disconnected. Re-establishing channel...');
+            setTimeout(setupLongLivedPort, 1000);
+        });
     }
 
-    // Creates an elegant status card inside AI Studio web page
     function createOnPageIndicator(lang) {
         const text = lang === 'RU' ? 'Без сна: Активен' : 'No Sleep: Active';
         
@@ -218,9 +228,30 @@
             gap: 8px;
             z-index: 999999;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            pointer-events: none;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            cursor: default;
         `;
+
+        // Hover-to-fade effect (prohibits HUD from blocking clicks)
+        container.addEventListener('mouseenter', () => {
+            container.style.opacity = '0.1';
+            container.style.pointerEvents = 'none'; // Click through
+        });
+
+        // Restore when mouse leaves the bottom-right corner region
+        window.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            const padding = 50; // zone of restoration
+            if (
+                e.clientX < rect.left - padding || 
+                e.clientX > rect.right + padding || 
+                e.clientY < rect.top - padding || 
+                e.clientY > rect.bottom + padding
+            ) {
+                container.style.opacity = '1';
+                container.style.pointerEvents = 'auto';
+            }
+        });
 
         const dot = document.createElement('div');
         dot.style.cssText = `
@@ -231,7 +262,6 @@
             box-shadow: 0 0 8px #10b981;
         `;
 
-        // Pulse keyframe animation using standard style tag
         const style = document.createElement('style');
         style.textContent = `
             @keyframes hudPulse {
@@ -249,5 +279,55 @@
         container.appendChild(dot);
         container.appendChild(label);
         document.body.appendChild(container);
+    }
+
+    // Synthesis chime sound upon completion
+    function playChime() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5 Note
+            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5 Note
+            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3); // G5 Note
+
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.6);
+        } catch (e) {
+            // Suppress browser context blockers
+        }
+    }
+
+    // Watches AI Studio DOM state transitions (Generation Active -> Finish)
+    function startGenerationObserver() {
+        let isGenerating = false;
+
+        const observer = new MutationObserver(() => {
+            // AI Studio "Stop/Cancel" button usually appears when stream is active
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const hasStopButton = buttons.some(btn => {
+                const text = btn.innerText ? btn.innerText.toLowerCase() : '';
+                return text.includes('stop') || text.includes('cancel');
+            });
+
+            if (hasStopButton && !isGenerating) {
+                isGenerating = true; // Generation started
+                console.log('[AI Studio No Sleep] Detected stream start.');
+            } else if (!hasStopButton && isGenerating) {
+                isGenerating = false; // Generation finished!
+                console.log('[AI Studio No Sleep] Stream finished. Playing chime.');
+                playChime();
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 })();

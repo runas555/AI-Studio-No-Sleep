@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Fixes cold starts via Ultrasound Media Priority Hack (19kHz).
- * File: patch-cold-start-fix.cjs
+ * PATCH SCRIPT: Removes all on-page DOM visual indicators (Invisible Edition).
+ * File: patch-invisible.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -23,11 +23,11 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- UPDATED CONTENT SCRIPT WITH ULTRASOUND MEDIA HACK ---
-const ultrasoundContentJs = `
+// --- UPDATED INVISIBLE CONTENT SCRIPT ---
+const invisibleContentJs = `
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.9 - Cold Start Fixed)
- * Features: Ultrasound Media Priority Hack (19,000Hz) to prevent minimized throttling.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.2 - Invisible Edition)
+ * Zero page-DOM modifications. Pure background execution.
  */
 (function() {
     'use strict';
@@ -57,9 +57,8 @@ const ultrasoundContentJs = `
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Ultra-priority background layers online.');
+        console.log('[AI Studio No Sleep] Background shield running invisibly.');
 
-        // ALWAYS ENABLE ULTRASOUND KEEPALIVE (It's the only 100% stable way in modern Chromium)
         if (config.audioKeepAlive) {
             enableUltrasoundPulse();
         }
@@ -69,8 +68,9 @@ const ultrasoundContentJs = `
         }
 
         setupLongLivedPort();
-        createOnPageIndicator(lang);
-        startGenerationObserver();
+        
+        // Starts observers for StopWatch, Auto-Scroll, Wake-Lock
+        startGenerationObserver(lang);
     }
 
     function injectDOMHook() {
@@ -170,7 +170,6 @@ const ultrasoundContentJs = `
         });
     }
 
-    // ULTRASOUND MEDIA HACK: Triggers 19,000Hz wave to get high-priority media state from OS
     function enableUltrasoundPulse() {
         let audioContext;
         const startAudio = () => {
@@ -181,24 +180,17 @@ const ultrasoundContentJs = `
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                // 19,000 Hz is completely inaudible for adults, but registers as active sound playback
                 osc.frequency.setValueAtTime(19000, audioContext.currentTime); 
-                gain.gain.setValueAtTime(0.002, audioContext.currentTime); // Inaudible volume scale
+                gain.gain.setValueAtTime(0.002, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
                 
-                console.log('[AI Studio No Sleep] Ultrasound keep-alive engaged. Tab priority locked.');
-                
-                // Remove listeners after first successful gesture unlock
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
-            } catch (err) {
-                console.warn('[AI Studio No Sleep] Ultrasound failed:', err);
-            }
+            } catch (err) {}
         };
-        // Browser requires a quick click anywhere on the page to unlock media playback
         window.addEventListener('click', startAudio, { passive: true });
         window.addEventListener('keydown', startAudio, { passive: true });
     }
@@ -240,108 +232,11 @@ const ultrasoundContentJs = `
         });
     }
 
-    function createOnPageIndicator(lang) {
-        const text = lang === 'RU' ? 'Без сна: Активен' : 'No Sleep: Active';
-        
-        const container = document.createElement('div');
-        container.id = 'ai-studio-nosleep-hud';
-        container.style.cssText = \`
-            position: fixed;
-            bottom: 12px;
-            right: 12px;
-            background-color: #1e293b;
-            color: #f8fafc;
-            border: 1px solid #334155;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transition: opacity 0.2s ease, transform 0.2s ease;
-            cursor: default;
-        \`;
-
-        container.addEventListener('mouseenter', () => {
-            container.style.opacity = '0.1';
-            container.style.pointerEvents = 'none';
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            const rect = container.getBoundingClientRect();
-            const padding = 50;
-            if (
-                e.clientX < rect.left - padding || 
-                e.clientX > rect.right + padding || 
-                e.clientY < rect.top - padding || 
-                e.clientY > rect.bottom + padding
-            ) {
-                container.style.opacity = '1';
-                container.style.pointerEvents = 'auto';
-            }
-        });
-
-        const dot = document.createElement('div');
-        dot.style.cssText = \`
-            width: 8px;
-            height: 8px;
-            background-color: #10b981;
-            border-radius: 50%;
-            box-shadow: 0 0 8px #10b981;
-        \`;
-
-        const style = document.createElement('style');
-        style.textContent = \`
-            @keyframes hudPulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.2); opacity: 0.6; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-        \`;
-        document.head.appendChild(style);
-        dot.style.animation = 'hudPulse 2s infinite ease-in-out';
-
-        const label = document.createElement('span');
-        label.innerText = text;
-
-        container.appendChild(dot);
-        container.appendChild(label);
-        document.body.appendChild(container);
-    }
-
-    function playChime() {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15);
-            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3);
-
-            gain.gain.setValueAtTime(0.15, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-
-            osc.start();
-            osc.stop(ctx.currentTime + 0.6);
-        } catch (e) {}
-    }
-
     let scrollInterval = null;
     function startAutoScroll() {
         if (scrollInterval) clearInterval(scrollInterval);
-        
         scrollInterval = setInterval(() => {
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            
             const elements = document.querySelectorAll('div, section, main, md-block');
             elements.forEach(el => {
                 const overflow = window.getComputedStyle(el).overflowY;
@@ -365,24 +260,76 @@ const ultrasoundContentJs = `
         try {
             if ('wakeLock' in navigator) {
                 wakeLockInstance = await navigator.wakeLock.request('screen');
-                console.log('[AI Studio No Sleep] OS Screen Wake Lock successfully active.');
             }
-        } catch (e) {
-            console.warn('[AI Studio No Sleep] System Wake Lock request rejected:', e);
-        }
+        } catch (e) {}
     }
 
     function releaseWakeLock() {
         if (wakeLockInstance) {
             wakeLockInstance.release().then(() => {
                 wakeLockInstance = null;
-                console.log('[AI Studio No Sleep] OS Screen Wake Lock released.');
             });
         }
     }
 
-    function startGenerationObserver() {
+    // --- BACKEND STOPWATCH & TAB FLASH ---
+    let stopwatchInterval = null;
+    let stopwatchSeconds = 0;
+    let flashTitleInterval = null;
+    let originalTitle = document.title || "Google AI Studio";
+
+    function startStopwatch() {
+        stopwatchSeconds = 0;
+        if (stopwatchInterval) clearInterval(stopwatchInterval);
+
+        stopwatchInterval = setInterval(() => {
+            stopwatchSeconds++;
+            const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
+            const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
+            document.title = \`⚡ [\${minutes}:\${seconds}] Generating... | AI Studio\`;
+        }, 1000);
+    }
+
+    function stopStopwatch() {
+        if (stopwatchInterval) {
+            clearInterval(stopwatchInterval);
+            stopwatchInterval = null;
+        }
+    }
+
+    function startTabTitleFlashing(lang) {
+        if (flashTitleInterval) clearInterval(flashTitleInterval);
+        
+        let toggle = false;
+        const state1 = lang === 'RU' ? '✅ Готово! | AI Studio' : '✅ DONE! | AI Studio';
+        const state2 = lang === 'RU' ? '★ Ответ готов! ★' : '★ AI Answer Ready! ★';
+
+        flashTitleInterval = setInterval(() => {
+            document.title = toggle ? state1 : state2;
+            toggle = !toggle;
+        }, 1000);
+    }
+
+    function stopTabTitleFlashing() {
+        if (flashTitleInterval) {
+            clearInterval(flashTitleInterval);
+            flashTitleInterval = null;
+        }
+        document.title = originalTitle;
+    }
+
+    window.addEventListener('focus', () => {
+        stopTabTitleFlashing();
+    });
+
+    function startGenerationObserver(lang) {
         let isGenerating = false;
+
+        setTimeout(() => {
+            if (document.title && !document.title.includes('Generating')) {
+                originalTitle = document.title;
+            }
+        }, 2000);
 
         const observer = new MutationObserver(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
@@ -393,19 +340,19 @@ const ultrasoundContentJs = `
 
             if (hasStopButton && !isGenerating) {
                 isGenerating = true;
-                console.log('[AI Studio No Sleep] Generation started.');
                 
+                stopTabTitleFlashing();
                 requestWakeLock();
                 startAutoScroll();
+                startStopwatch();
                 
             } else if (!hasStopButton && isGenerating) {
                 isGenerating = false;
-                console.log('[AI Studio No Sleep] Generation finished.');
                 
                 releaseWakeLock();
                 stopAutoScroll();
-                
-                playChime();
+                stopStopwatch();
+                startTabTitleFlashing(lang);
             }
         });
 
@@ -416,16 +363,16 @@ const ultrasoundContentJs = `
 
 function run() {
     if (!fs.existsSync(contentFile)) {
-        log('Extension content.js file is missing. Run setup.cjs first.', 'error');
+        log('Extension assets missing. Run setup.cjs first.', 'error');
         process.exit(1);
     }
 
     try {
-        fs.writeFileSync(contentFile, ultrasoundContentJs.trim() + '\n', 'utf8');
-        log('Applied Ultrasound Media Priority (19kHz) Hack inside content.js.', 'success');
-        log('Please reload the extension inside edge://extensions/ to apply change.', 'info');
+        fs.writeFileSync(contentFile, invisibleContentJs.trim() + '\n', 'utf8');
+        log('Removed all on-page HUD rendering. Extension is now 100% invisible on AI Studio.', 'success');
+        log('Please reload the extension inside edge://extensions/ to apply modifications.', 'info');
     } catch (e) {
-        log(`Failed to apply ultrasound patch: ${e.message}`, 'error');
+        log(`Failed to patch invisible mode: ${e.message}`, 'error');
     }
 }
 

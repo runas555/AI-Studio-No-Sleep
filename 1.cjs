@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Core Infrasound (1Hz) & chrome.power API integration.
- * File: patch-cold-start-final.cjs
+ * PATCH SCRIPT: Fixes Angular Custom Scrollbars and re-orders finish sequence.
+ * File: patch-angular-scroll.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -12,9 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const targetFolder = path.join(process.cwd(), 'persistent-engine-ext');
-const manifestFile = path.join(targetFolder, 'manifest.json');
 const contentFile = path.join(targetFolder, 'content.js');
-const backgroundFile = path.join(targetFolder, 'background.js');
 
 function log(msg, type = 'info') {
     const colors = {
@@ -25,146 +23,11 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- 1. UPDATE MANIFEST WITH SYSTEM POWER API PERMISSION ---
-function patchManifest() {
-    if (!fs.existsSync(manifestFile)) return false;
-    try {
-        const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-        
-        if (!manifest.permissions.includes('power')) {
-            manifest.permissions.push('power');
-        }
-        
-        fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 4), 'utf8');
-        log('Added system "power" keep-awake permission to manifest.json.', 'success');
-        return true;
-    } catch (e) {
-        log(`Failed to patch manifest: ${e.message}`, 'error');
-        return false;
-    }
-}
-
-// --- 2. UPDATE BACKGROUND WITH POWER AWAKE FORCE ---
-const updatedBackgroundJs = `
-let activePulseInterval = null;
-const connectedPorts = new Set();
-
-chrome.runtime.onInstalled.addListener(() => {
-    chrome.storage.local.set({
-        engineActive: true,
-        preventThrottling: true,
-        audioKeepAlive: true,
-        activitySimulation: true,
-        heartbeatRate: 15,
-        savedCyclesCount: 0
-    });
-    updateToolbarBadge();
-});
-
-// Force-keep the system process awake using official Chrome Power API
-function requestSystemAwake() {
-    try {
-        chrome.power.requestKeepAwake('system');
-        console.log('[AI Studio No Sleep] System background process wake-lock engaged.');
-    } catch (e) {
-        console.warn('[AI Studio No Sleep] Failed to lock system state:', e);
-    }
-}
-
-function broadcastWakeUp() {
-    connectedPorts.forEach(port => {
-        try {
-            port.postMessage({ type: 'WAKE_UP_PULSE' });
-        } catch (e) {
-            connectedPorts.add(port);
-        }
-    });
-
-    chrome.tabs.query({}, (tabs) => {
-        tabs.forEach(tab => {
-            if (tab.url && tab.url.includes('aistudio.google.com')) {
-                chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
-                    if (chrome.runtime.lastError) return;
-                });
-            }
-        });
-    });
-}
-
-function startGlobalPulse() {
-    requestSystemAwake();
-    if (activePulseInterval) clearInterval(activePulseInterval);
-    activePulseInterval = setInterval(broadcastWakeUp, 500);
-}
-
-function updateToolbarBadge() {
-    chrome.storage.local.get(['engineActive'], (res) => {
-        const active = res.engineActive !== false;
-        if (active) {
-            chrome.action.setBadgeText({ text: "ON" });
-            chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
-        } else {
-            chrome.action.setBadgeText({ text: "OFF" });
-            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
-        }
-    });
-}
-
-chrome.runtime.onConnect.addListener((port) => {
-    if (port.name === "KeepAlivePort") {
-        connectedPorts.add(port);
-        if (!activePulseInterval) startGlobalPulse();
-
-        port.onDisconnect.addListener(() => {
-            connectedPorts.delete(port);
-            if (connectedPorts.size === 0 && activePulseInterval) {
-                clearInterval(activePulseInterval);
-                activePulseInterval = null;
-                try { chrome.power.releaseKeepAwake(); } catch (e) {}
-            }
-        });
-    }
-});
-
-chrome.tabs.onActivated.addListener((activeInfo) => {
-    chrome.storage.local.get(['engineActive'], (res) => {
-        if (res.engineActive !== false) {
-            chrome.tabs.update(activeInfo.tabId, { autoDiscardable: false }, () => {
-                if (chrome.runtime.lastError) return;
-            });
-        }
-    });
-});
-
-startGlobalPulse();
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === 'SIGNAL_PREVENT_PAUSE') {
-        chrome.storage.local.get(['savedCyclesCount'], (res) => {
-            const current = res.savedCyclesCount || 0;
-            chrome.storage.local.set({ savedCyclesCount: current + 1 });
-            sendResponse({ ack: true, currentCount: current + 1 });
-        });
-        return true; 
-    }
-    if (request.type === 'KEEP_ALIVE') {
-        if (!activePulseInterval) startGlobalPulse();
-        sendResponse({ alive: true });
-        return false;
-    }
-    if (request.type === 'TOGGLE_ACTIVE') {
-        setTimeout(updateToolbarBadge, 100);
-        sendResponse({ ack: true });
-        return false;
-    }
-});
-`;
-
-// --- 3. UPDATE CONTENT WITH 1HZ INFRASOUND HACK ---
-const updatedContentJs = `
+// --- UPDATED CONTENT SCRIPT WITH ANGULAR SCROLL DISCOVERY & SEQUENTIAL NOTIFICATIONS ---
+const angularScrollContentJs = `
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.3 - Final Cold Start Fix)
- * Features: Infrasound Media Priority (1Hz) to completely bypass Edge sleeping mode.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.7 - Angular Scroll & Sequence Fixed)
+ * Features: Infrasound Priority, Screen Wake Lock, Adaptive Angular Scroll, Delayed Finish Notifications.
  */
 (function() {
     'use strict';
@@ -194,7 +57,7 @@ const updatedContentJs = `
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Initializing infrasound shield...');
+        console.log('[AI Studio No Sleep] Safety protocols active.');
 
         if (config.audioKeepAlive) {
             enableInfrasoundPulse();
@@ -305,7 +168,6 @@ const updatedContentJs = `
         });
     }
 
-    // INFRASOUND HACK: Plays 1Hz at 0.02 volume (100% silent, completely forces Edge media priority)
     function enableInfrasoundPulse() {
         let audioContext;
         const startAudio = () => {
@@ -316,14 +178,12 @@ const updatedContentJs = `
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime); // 1Hz infrasound
+                osc.frequency.setValueAtTime(1, audioContext.currentTime); 
                 gain.gain.setValueAtTime(0.02, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
-                
-                console.log('[AI Studio No Sleep] Infrasound Priority locked.');
                 
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
@@ -374,14 +234,7 @@ const updatedContentJs = `
     function startAutoScroll() {
         if (scrollInterval) clearInterval(scrollInterval);
         scrollInterval = setInterval(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            const elements = document.querySelectorAll('div, section, main, md-block');
-            elements.forEach(el => {
-                const overflow = window.getComputedStyle(el).overflowY;
-                if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
-                    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-                }
-            });
+            performAdaptiveScroll();
         }, 800);
     }
 
@@ -390,6 +243,38 @@ const updatedContentJs = `
             clearInterval(scrollInterval);
             scrollInterval = null;
         }
+    }
+
+    // --- ADAPTIVE ANGULAR & NATIVE SCROLL ENGINE ---
+    // Finds custom Angular scroll viewports and forces scroll position to maximum height
+    function performAdaptiveScroll() {
+        // 1. Scroll main window
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+        // 2. Discover and scroll native scrollable elements
+        const elements = document.querySelectorAll('div, section, main, md-block');
+        elements.forEach(el => {
+            const overflow = window.getComputedStyle(el).overflowY;
+            if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
+                el.scrollTop = el.scrollHeight;
+            }
+        });
+
+        // 3. TARGET ANGULAR CUSTOM SCROLLBARS (Finds scrollbar-handle and traces back to viewport)
+        const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
+        customHandles.forEach(handle => {
+            let parent = handle.parentElement;
+            // Traverse up to find the wrapped viewport container
+            while (parent && parent !== document.body) {
+                const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
+                innerViewports.forEach(vp => {
+                    if (vp.scrollHeight > vp.clientHeight) {
+                        vp.scrollTop = vp.scrollHeight;
+                    }
+                });
+                parent = parent.parentElement;
+            }
+        });
     }
 
     let wakeLockInstance = null;
@@ -434,6 +319,20 @@ const updatedContentJs = `
         }
     }
 
+    function triggerFinishNotifications(lang) {
+        const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
+        const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
+
+        // Trigger OS notification banner
+        chrome.runtime.sendMessage({ 
+            type: 'SHOW_OS_NOTIFICATION', 
+            duration: \`\${minutes}:\${seconds}\` 
+        });
+
+        // Trigger browser tab flashing
+        startTabTitleFlashing(lang);
+    }
+
     function startTabTitleFlashing(lang) {
         if (flashTitleInterval) clearInterval(flashTitleInterval);
         
@@ -459,6 +358,12 @@ const updatedContentJs = `
         stopTabTitleFlashing();
     });
 
+    const preventTabClose = (e) => {
+        e.preventDefault();
+        e.returnValue = 'AI Studio is actively generating text in the background. Are you sure you want to exit?';
+        return e.returnValue;
+    };
+
     function startGenerationObserver(lang) {
         let isGenerating = false;
 
@@ -483,13 +388,25 @@ const updatedContentJs = `
                 startAutoScroll();
                 startStopwatch();
                 
+                window.addEventListener('beforeunload', preventTabClose, { capture: true });
+                
             } else if (!hasStopButton && isGenerating) {
                 isGenerating = false;
                 
                 releaseWakeLock();
                 stopAutoScroll();
-                stopStopwatch();
-                startTabTitleFlashing(lang);
+                
+                // 1. Force guaranteed scroll to bottom on custom scroll containers immediately
+                performAdaptiveScroll();
+                
+                // 2. Delay notifications for 150ms to let the DOM settle and finish rendering the scroll position
+                setTimeout(() => {
+                    performAdaptiveScroll(); // Double-check final coordinate lock
+                    stopStopwatch();
+                    triggerFinishNotifications(lang);
+                }, 150);
+                
+                window.removeEventListener('beforeunload', preventTabClose, { capture: true });
             }
         });
 
@@ -499,19 +416,17 @@ const updatedContentJs = `
 `;
 
 function run() {
-    if (!fs.existsSync(contentFile) || !fs.existsSync(backgroundFile)) {
+    if (!fs.existsSync(contentFile)) {
         log('Extension assets missing. Run setup.cjs first.', 'error');
         process.exit(1);
     }
 
     try {
-        patchManifest();
-        fs.writeFileSync(contentFile, updatedContentJs.trim() + '\n', 'utf8');
-        fs.writeFileSync(backgroundFile, updatedBackgroundJs.trim() + '\n', 'utf8');
-        log('Applied ultimate Infrasound (1Hz) + chrome.power System keep-awake patches.', 'success');
+        fs.writeFileSync(contentFile, angularScrollContentJs.trim() + '\n', 'utf8');
+        log('Successfully resolved Angular Custom Scrollbar bypass and re-ordered finish notifications.', 'success');
         log('Please reload the extension inside edge://extensions/.', 'info');
     } catch (e) {
-        log(`Failed to patch final cold start: ${e.message}`, 'error');
+        log(`Failed to patch angular scroll: ${e.message}`, 'error');
     }
 }
 

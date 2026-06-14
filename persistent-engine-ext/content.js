@@ -1,6 +1,6 @@
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.3 - Final Cold Start Fix)
- * Features: Infrasound Media Priority (1Hz) to completely bypass Edge sleeping mode.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.7 - Angular Scroll & Sequence Fixed)
+ * Features: Infrasound Priority, Screen Wake Lock, Adaptive Angular Scroll, Delayed Finish Notifications.
  */
 (function() {
     'use strict';
@@ -30,7 +30,7 @@
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Initializing infrasound shield...');
+        console.log('[AI Studio No Sleep] Safety protocols active.');
 
         if (config.audioKeepAlive) {
             enableInfrasoundPulse();
@@ -141,7 +141,6 @@
         });
     }
 
-    // INFRASOUND HACK: Plays 1Hz at 0.02 volume (100% silent, completely forces Edge media priority)
     function enableInfrasoundPulse() {
         let audioContext;
         const startAudio = () => {
@@ -152,14 +151,12 @@
                 const gain = audioContext.createGain();
                 
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime); // 1Hz infrasound
+                osc.frequency.setValueAtTime(1, audioContext.currentTime); 
                 gain.gain.setValueAtTime(0.02, audioContext.currentTime); 
                 
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
-                
-                console.log('[AI Studio No Sleep] Infrasound Priority locked.');
                 
                 window.removeEventListener('click', startAudio);
                 window.removeEventListener('keydown', startAudio);
@@ -210,14 +207,7 @@
     function startAutoScroll() {
         if (scrollInterval) clearInterval(scrollInterval);
         scrollInterval = setInterval(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            const elements = document.querySelectorAll('div, section, main, md-block');
-            elements.forEach(el => {
-                const overflow = window.getComputedStyle(el).overflowY;
-                if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
-                    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-                }
-            });
+            performAdaptiveScroll();
         }, 800);
     }
 
@@ -226,6 +216,38 @@
             clearInterval(scrollInterval);
             scrollInterval = null;
         }
+    }
+
+    // --- ADAPTIVE ANGULAR & NATIVE SCROLL ENGINE ---
+    // Finds custom Angular scroll viewports and forces scroll position to maximum height
+    function performAdaptiveScroll() {
+        // 1. Scroll main window
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+        // 2. Discover and scroll native scrollable elements
+        const elements = document.querySelectorAll('div, section, main, md-block');
+        elements.forEach(el => {
+            const overflow = window.getComputedStyle(el).overflowY;
+            if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
+                el.scrollTop = el.scrollHeight;
+            }
+        });
+
+        // 3. TARGET ANGULAR CUSTOM SCROLLBARS (Finds scrollbar-handle and traces back to viewport)
+        const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
+        customHandles.forEach(handle => {
+            let parent = handle.parentElement;
+            // Traverse up to find the wrapped viewport container
+            while (parent && parent !== document.body) {
+                const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
+                innerViewports.forEach(vp => {
+                    if (vp.scrollHeight > vp.clientHeight) {
+                        vp.scrollTop = vp.scrollHeight;
+                    }
+                });
+                parent = parent.parentElement;
+            }
+        });
     }
 
     let wakeLockInstance = null;
@@ -270,6 +292,20 @@
         }
     }
 
+    function triggerFinishNotifications(lang) {
+        const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
+        const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
+
+        // Trigger OS notification banner
+        chrome.runtime.sendMessage({ 
+            type: 'SHOW_OS_NOTIFICATION', 
+            duration: `${minutes}:${seconds}` 
+        });
+
+        // Trigger browser tab flashing
+        startTabTitleFlashing(lang);
+    }
+
     function startTabTitleFlashing(lang) {
         if (flashTitleInterval) clearInterval(flashTitleInterval);
         
@@ -295,6 +331,12 @@
         stopTabTitleFlashing();
     });
 
+    const preventTabClose = (e) => {
+        e.preventDefault();
+        e.returnValue = 'AI Studio is actively generating text in the background. Are you sure you want to exit?';
+        return e.returnValue;
+    };
+
     function startGenerationObserver(lang) {
         let isGenerating = false;
 
@@ -319,13 +361,25 @@
                 startAutoScroll();
                 startStopwatch();
                 
+                window.addEventListener('beforeunload', preventTabClose, { capture: true });
+                
             } else if (!hasStopButton && isGenerating) {
                 isGenerating = false;
                 
                 releaseWakeLock();
                 stopAutoScroll();
-                stopStopwatch();
-                startTabTitleFlashing(lang);
+                
+                // 1. Force guaranteed scroll to bottom on custom scroll containers immediately
+                performAdaptiveScroll();
+                
+                // 2. Delay notifications for 150ms to let the DOM settle and finish rendering the scroll position
+                setTimeout(() => {
+                    performAdaptiveScroll(); // Double-check final coordinate lock
+                    stopStopwatch();
+                    triggerFinishNotifications(lang);
+                }, 150);
+                
+                window.removeEventListener('beforeunload', preventTabClose, { capture: true });
             }
         });
 

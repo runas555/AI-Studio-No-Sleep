@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Persistent Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { width: 320px; font-family: 'Inter', sans-serif; }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: "";
+            height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #3b82f6; }
+        input:checked + .slider:before { transform: translateX(26px); }
+    </style>
+</head>
+<body class="bg-slate-900 text-white p-4">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-lg font-bold">Persistent Engine</h1>
+        <div class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30">v1.0.0</div>
+    </div>
+
+    <div class="space-y-4">
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium">Activity Spoofer</p>
+                <p class="text-xs text-slate-400">Keep visibility status constant</p>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="mainToggle" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Status</span>
+            </div>
+            <div id="statusText" class="text-sm text-slate-200">
+                Simulation is active on target tabs.
+            </div>
+        </div>
+
+        <div class="bg-blue-600/10 border border-blue-500/20 p-3 rounded-lg">
+            <p class="text-[10px] leading-relaxed text-blue-300">
+                Note: Refresh AI Studio or targeted pages after enabling/disabling the engine for changes to take effect.
+            </p>
+        </div>
+    </div>
+
+    <footer class="mt-6 pt-4 border-t border-slate-800 flex justify-center">
+        <button class="text-slate-500 hover:text-slate-300 text-xs transition-colors">
+            Documentation & FAQ
+        </button>
+    </footer>
+
+    <script src="popup.js"></script>
+</body>
+</html>

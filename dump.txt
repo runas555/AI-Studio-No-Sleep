@@ -1,10 +1,10 @@
 ================================================================================
-AI STUDIO NO SLEEP - COMPLETE VERIFICATION DUMP
+PERSISTENT ENGINE - CURRENT STATE POST-ROLLBACK DUMP
+Generated: 2026-06-14T10:00:34.092Z
+Active Commit State: 6d7475123c52d551972dbbf5eebb3a0f85efad77
 ================================================================================
-Generated: 2026-06-14T09:29:20.139Z
-Scope: Strict aistudio.google.com
 
---- FILE 1: manifest.json ---
+--- START OF FILE: manifest.json ---
 {
     "manifest_version": 3,
     "name": "AI Studio No Sleep",
@@ -50,11 +50,12 @@ Scope: Strict aistudio.google.com
         "128": "icons/icon128.png"
     }
 }
+--- END OF FILE: manifest.json ---
 
---- FILE 2: content.js (Advanced spoofing + Infrasound 1Hz + Angular scroll + Close Protection) ---
+--- START OF FILE: content.js ---
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.8 - Dynamic Badges & Final Scroll)
- * Features: Infrasound Priority, Screen Wake Lock, Adaptive Angular Scroll, Delayed Finish Notifications, Accidental Close, Checkmark Badges.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v2.9 - Unbreakable Scroll)
+ * Features: Infrasound Priority, Screen Wake Lock, Event-Driven Angular CDK Scroll, Delayed Finish Notifications.
  */
 (function() {
     'use strict';
@@ -272,17 +273,26 @@ Scope: Strict aistudio.google.com
         }
     }
 
+    // --- ADAPTIVE UNBREAKABLE SCROLL ENGINE ---
+    // Forces coordinates and dispatches native 'scroll' events to trigger Angular CDK digests
     function performAdaptiveScroll() {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        // 1. Force native document bottom
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 
-        const elements = document.querySelectorAll('div, section, main, md-block');
-        elements.forEach(el => {
-            const overflow = window.getComputedStyle(el).overflowY;
-            if (el.scrollHeight > el.clientHeight && (overflow === 'auto' || overflow === 'scroll')) {
-                el.scrollTop = el.scrollHeight;
+        // 2. Scan for all potential viewports (including Angular CDK specific selectors)
+        const targets = document.querySelectorAll('cdk-virtual-scroll-viewport, .scrollbar-handle, .ng-scrollbar-handle, [class*="viewport"], [class*="scroll"], div, section, main');
+        
+        targets.forEach(el => {
+            if (el.scrollHeight > el.clientHeight) {
+                // Set absolute scroll height limit
+                el.scrollTop = el.scrollHeight + 5000;
+                
+                // CRITICAL FIX: Dispatch native scroll event so Angular Virtual Scroll intercepts it!
+                el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
             }
         });
 
+        // 3. Fallback trace through custom handles parents
         const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
         customHandles.forEach(handle => {
             let parent = handle.parentElement;
@@ -290,12 +300,27 @@ Scope: Strict aistudio.google.com
                 const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
                 innerViewports.forEach(vp => {
                     if (vp.scrollHeight > vp.clientHeight) {
-                        vp.scrollTop = vp.scrollHeight;
+                        vp.scrollTop = vp.scrollHeight + 5000;
+                        vp.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
                     }
                 });
                 parent = parent.parentElement;
             }
         });
+
+        // 4. LOW-LEVEL KEYBOARD EMULATION: Emulate physical 'End' key on active element
+        try {
+            const activeEl = document.activeElement || document.body;
+            const endEvent = new KeyboardEvent('keydown', {
+                key: 'End',
+                code: 'End',
+                keyCode: 35,
+                which: 35,
+                bubbles: true,
+                cancelable: true
+            });
+            activeEl.dispatchEvent(endEvent);
+        } catch (e) {}
     }
 
     let wakeLockInstance = null;
@@ -346,7 +371,7 @@ Scope: Strict aistudio.google.com
 
         chrome.runtime.sendMessage({ 
             type: 'SHOW_OS_NOTIFICATION', 
-            duration: `${minutes}:${seconds}` 
+            duration: `${minutes}:default${seconds}` 
         });
 
         startTabTitleFlashing(lang);
@@ -407,7 +432,6 @@ Scope: Strict aistudio.google.com
                 startAutoScroll();
                 startStopwatch();
                 
-                // Set Badge to active "ON" when streaming starts
                 chrome.runtime.sendMessage({ type: 'SET_BADGE_ON' });
                 
                 window.addEventListener('beforeunload', preventTabClose, { capture: true });
@@ -418,16 +442,20 @@ Scope: Strict aistudio.google.com
                 releaseWakeLock();
                 stopAutoScroll();
                 
+                // MICRO-LOOP HARD COORD RESET (Fires 3 times to sync late Angular rendering chunks)
                 performAdaptiveScroll();
                 
+                setTimeout(() => { performAdaptiveScroll(); }, 60);
+                setTimeout(() => { performAdaptiveScroll(); }, 120);
+                
+                // Finalize only after the final render ticks have landed and synced
                 setTimeout(() => {
-                    performAdaptiveScroll();
+                    performAdaptiveScroll(); // One last check
                     stopStopwatch();
                     triggerFinishNotifications(lang);
                     
-                    // Set Toolbar Badge to Checkmark "✓" on final scroll completion
                     chrome.runtime.sendMessage({ type: 'SET_BADGE_CHECKMARK' });
-                }, 150);
+                }, 220);
                 
                 window.removeEventListener('beforeunload', preventTabClose, { capture: true });
             }
@@ -436,8 +464,9 @@ Scope: Strict aistudio.google.com
         observer.observe(document.body, { childList: true, subtree: true });
     }
 })();
+--- END OF FILE: content.js ---
 
---- FILE 3: background.js (KeepAlivePorts + chrome.power System Lock + Dynamic Badge) ---
+--- START OF FILE: background.js ---
 let activePulseInterval = null;
 const connectedPorts = new Set();
 
@@ -583,8 +612,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return false;
     }
 });
+--- END OF FILE: background.js ---
 
---- FILE 4: popup.html (Minimalist UX with SVG Flag segmenters & Neon Pulse bars) ---
+--- START OF FILE: popup.html ---
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -913,8 +943,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     <script src="popup.js"></script>
 </body>
 </html>
+--- END OF FILE: popup.html ---
 
---- FILE 5: popup.js (Localization & live animation state triggers) ---
+--- START OF FILE: popup.js ---
 const LOCALIZATION = {
     EN: {
         logo: "AI STUDIO NO SLEEP",
@@ -1085,6 +1116,8 @@ document.addEventListener('DOMContentLoaded', () => {
         chrome.storage.local.set({ activitySimulation: dom.activitySimulation.checked });
     });
 });
+--- END OF FILE: popup.js ---
+
 ================================================================================
 END OF DUMP
 ================================================================================

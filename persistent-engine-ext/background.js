@@ -9,6 +9,7 @@ chrome.runtime.onInstalled.addListener(() => {
         heartbeatRate: 15,
         savedCyclesCount: 0
     });
+    updateToolbarBadge();
 });
 
 // High-frequency tick initiator
@@ -18,13 +19,16 @@ function startGlobalPulse() {
     activePulseInterval = setInterval(() => {
         chrome.storage.local.get(['engineActive'], (res) => {
             if (res.engineActive !== false) {
-                // Query all tabs and send wake-up triggers
                 chrome.tabs.query({}, (tabs) => {
                     tabs.forEach(tab => {
-                        // Safe dispatch avoiding internal extension pages
                         if (tab.url && tab.url.startsWith('http')) {
+                            // Send wake-up triggers
                             chrome.tabs.sendMessage(tab.id, { type: 'WAKE_UP_PULSE' }, () => {
-                                // Clear last error to suppress console noise for inactive frames
+                                if (chrome.runtime.lastError) return;
+                            });
+
+                            // CRITICAL EDGE FIX: Prevent Tab Discarding (sleeping tabs mode) on active pages
+                            chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
                                 if (chrome.runtime.lastError) return;
                             });
                         }
@@ -32,10 +36,34 @@ function startGlobalPulse() {
                 });
             }
         });
-    }, 500); // 500ms Wake up intervals to bypass minimized task freezing
+    }, 500);
 }
 
-// Keep connection alive on install/restart
+// Controls visual feedback Badge in Edge toolbar
+function updateToolbarBadge() {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        const active = res.engineActive !== false;
+        if (active) {
+            chrome.action.setBadgeText({ text: "ON" });
+            chrome.action.setBadgeBackgroundColor({ color: "#10b981" }); // Emerald Green
+        } else {
+            chrome.action.setBadgeText({ text: "OFF" });
+            chrome.action.setBadgeBackgroundColor({ color: "#ef4444" }); // Red
+        }
+    });
+}
+
+// Listen for tab switching to enforce non-discarding state dynamically
+chrome.tabs.onActivated.addListener((activeInfo) => {
+    chrome.storage.local.get(['engineActive'], (res) => {
+        if (res.engineActive !== false) {
+            chrome.tabs.update(activeInfo.tabId, { autoDiscardable: false }, () => {
+                if (chrome.runtime.lastError) return;
+            });
+        }
+    });
+});
+
 startGlobalPulse();
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -49,9 +77,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     
     if (request.type === 'KEEP_ALIVE') {
-        // Make sure background pulse is running
         if (!activePulseInterval) startGlobalPulse();
         sendResponse({ alive: true });
+        return false;
+    }
+
+    if (request.type === 'TOGGLE_ACTIVE') {
+        setTimeout(() => {
+            updateToolbarBadge();
+        }, 100);
+        sendResponse({ ack: true });
         return false;
     }
 });

@@ -1,44 +1,49 @@
 /**
- * UI CONTROLLER (With Multilingual SVG Flag Controller)
+ * SIMPLIFIED UI CONTROLLER
+ * Translated from developer terminology into plain, non-tech human language.
  */
 
 const LOCALIZATION = {
     EN: {
-        logo: "PERSISTENT ENGINE",
-        engineTitle: "Active Simulation Shield",
-        engineDesc: "Keeps tab execution active",
-        metPrevented: "PREVENTED PAUSES",
-        metStatus: "ENGINE STATE",
-        statusActive: "ACTIVE",
-        statusIdle: "OFFLINE",
-        modulesHeader: "SUB-SYSTEM CONFIGURATION",
-        modThrottleTitle: "Timer Optimization Bypass",
-        modThrottleDesc: "Forces background worker threads",
-        modAudioTitle: "Audio Keep-Alive Loop",
-        modAudioDesc: "Trick Edge from sleeping tab mode",
-        modPulseTitle: "Random Activity Pulse",
-        modPulseDesc: "Inject virtual mouse events"
+        logo: "ANTI-PAUSE GUARD",
+        engineTitle: "Background protection",
+        engineDesc: "Text will keep generating even if you minimize the browser or switch to another tab.",
+        metPrevented: "ACTIVE WORK CYCLES",
+        statusActive: "PROTECTION WORKING",
+        statusIdle: "PROTECTION PAUSED",
+        btnShowAdv: "Show extra options",
+        btnHideAdv: "Hide extra options",
+        
+        modThrottleTitle: "Force Background Speed",
+        modThrottleDesc: "Ensure text continues loading at normal speed in the background.",
+        modAudioTitle: "Prevent Tab Sleep Mode",
+        modAudioDesc: "Prevents browser from putting your background tab to sleep.",
+        modPulseTitle: "Imitate Activity",
+        modPulseDesc: "Moves a virtual cursor to bypass site idle detectors.",
+        footer: "Compatible with Microsoft Edge & Google Chrome"
     },
     RU: {
-        logo: "АКТИВНЫЙ РЕЖИМ",
-        engineTitle: "Симуляция активности",
-        engineDesc: "Предотвращает засыпание вкладки",
-        metPrevented: "БЛОКИРОВАНО ПАУЗ",
-        metStatus: "СТАТУС СИСТЕМЫ",
-        statusActive: "АКТИВЕН",
-        statusIdle: "ВЫКЛЮЧЕН",
-        modulesHeader: "КОНФИГУРАЦИЯ СУБМОДУЛЕЙ",
-        modThrottleTitle: "Обход оптимизации таймеров",
-        modThrottleDesc: "Запуск фоновых потоков Web Worker",
-        modAudioTitle: "Аудио Keep-Alive",
-        modAudioDesc: "Обход режима сна в Edge",
-        modPulseTitle: "Импульсы активности",
-        modPulseDesc: "Эмуляция движения мыши"
+        logo: "ЗАЩИТА ОТ ПАУЗ",
+        engineTitle: "Работа в фоне",
+        engineDesc: "Текст продолжит создаваться, даже если вы свернете браузер или перейдете в другую вкладку.",
+        metPrevented: "АКТИВНЫЕ ЦИКЛЫ РАБОТЫ",
+        statusActive: "ЗАЩИТА РАБОТАЕТ",
+        statusIdle: "ЗАЩИТА НА ПАУЗЕ",
+        btnShowAdv: "Показать дополнительные настройки",
+        btnHideAdv: "Скрыть дополнительные настройки",
+        
+        modThrottleTitle: "Ускорение работы в фоне",
+        modThrottleDesc: "Позволяет тексту генерироваться с обычной скоростью в фоне.",
+        modAudioTitle: "Защита от засыпания вкладки",
+        modAudioDesc: "Не дает браузеру переводить фоновую вкладку в режим энергосбережения.",
+        modPulseTitle: "Имитация активности",
+        modPulseDesc: "Двигает виртуальную мышь для обхода защиты сайтов от бездействия.",
+        footer: "Совместимо с Microsoft Edge и Google Chrome"
     }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    let currentLang = 'EN';
+    let currentLang = 'RU';
 
     const dom = {
         langBtnEN: document.getElementById('langBtnEN'),
@@ -47,15 +52,18 @@ document.addEventListener('DOMContentLoaded', () => {
         engineTitle: document.getElementById('txt-engine-title'),
         engineDesc: document.getElementById('txt-engine-desc'),
         metPrevented: document.getElementById('txt-met-prevented'),
-        metStatus: document.getElementById('txt-met-status'),
         statusLabel: document.getElementById('statusLabel'),
-        modulesHeader: document.getElementById('txt-modules-header'),
+        
+        toggleAdvanced: document.getElementById('toggleAdvanced'),
+        advancedPanel: document.getElementById('advancedPanel'),
+        
         modThrottleTitle: document.getElementById('txt-mod-throttle-title'),
         modThrottleDesc: document.getElementById('txt-mod-throttle-desc'),
         modAudioTitle: document.getElementById('txt-mod-audio-title'),
         modAudioDesc: document.getElementById('txt-mod-audio-desc'),
         modPulseTitle: document.getElementById('txt-mod-pulse-title'),
         modPulseDesc: document.getElementById('txt-mod-pulse-desc'),
+        footer: document.getElementById('txt-footer'),
 
         engineActive: document.getElementById('engineActive'),
         preventThrottling: document.getElementById('preventThrottling'),
@@ -67,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateLanguage(lang) {
         currentLang = lang;
         
-        // Toggle active segment buttons
         if (lang === 'EN') {
             dom.langBtnEN.classList.add('active');
             dom.langBtnRU.classList.remove('active');
@@ -81,14 +88,17 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.engineTitle.innerText = t.engineTitle;
         dom.engineDesc.innerText = t.engineDesc;
         dom.metPrevented.innerText = t.metPrevented;
-        dom.metStatus.innerText = t.metStatus;
-        dom.modulesHeader.innerText = t.modulesHeader;
+        
         dom.modThrottleTitle.innerText = t.modThrottleTitle;
         dom.modThrottleDesc.innerText = t.modThrottleDesc;
         dom.modAudioTitle.innerText = t.modAudioTitle;
         dom.modAudioDesc.innerText = t.modAudioDesc;
         dom.modPulseTitle.innerText = t.modPulseTitle;
         dom.modPulseDesc.innerText = t.modPulseDesc;
+        dom.footer.innerText = t.footer;
+
+        const isPanelOpen = dom.advancedPanel.classList.contains('open');
+        dom.toggleAdvanced.innerText = isPanelOpen ? t.btnHideAdv : t.btnShowAdv;
 
         updateStatusLabel();
     }
@@ -105,7 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Load actual sync states
+    dom.toggleAdvanced.addEventListener('click', () => {
+        const panel = dom.advancedPanel;
+        const isOpen = panel.classList.toggle('open');
+        const t = LOCALIZATION[currentLang];
+        dom.toggleAdvanced.innerText = isOpen ? t.btnHideAdv : t.btnShowAdv;
+    });
+
+    // Load initial storage states
     chrome.storage.local.get([
         'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
     ], (result) => {
@@ -115,11 +132,18 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.activitySimulation.checked = result.activitySimulation !== false;
         dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
         
-        const lang = result.uiLang || 'EN';
+        const lang = result.uiLang || 'RU';
         updateLanguage(lang);
     });
 
-    // Event listeners for segment switchers
+    // LIVE UPDATE LISTENER: React to storage changes immediately
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes.savedCyclesCount) {
+            const newVal = changes.savedCyclesCount.newValue || 0;
+            dom.counterVal.innerText = newVal.toLocaleString();
+        }
+    });
+
     dom.langBtnEN.addEventListener('click', () => {
         if (currentLang !== 'EN') {
             chrome.storage.local.set({ uiLang: 'EN' }, () => {
@@ -137,7 +161,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     dom.engineActive.addEventListener('change', () => {
-        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, updateStatusLabel);
+        chrome.storage.local.set({ engineActive: dom.engineActive.checked }, () => {
+            updateStatusLabel();
+            chrome.runtime.sendMessage({ type: 'TOGGLE_ACTIVE' });
+        });
     });
 
     dom.preventThrottling.addEventListener('change', () => {

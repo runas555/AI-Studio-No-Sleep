@@ -1,6 +1,6 @@
 /**
- * PERSISTENT ENGINE - CONTENT SCRIPT (v1.4 - Minimized Fixed)
- * Bypasses Chrome requestAnimationFrame throttling and minimized freezes.
+ * PERSISTENT ENGINE - CONTENT SCRIPT (v1.5 - Counter Restored)
+ * Bypasses Chrome throttling and restores real-time activity metrics.
  */
 (function() {
     'use strict';
@@ -40,7 +40,6 @@
             startVirtualInteractionLoop();
         }
 
-        // Connect and listen for background external wake-up ticks
         setupBackgroundListener();
     }
 
@@ -85,6 +84,9 @@
                     const silentBlocker = function(e) {
                         e.stopImmediatePropagation();
                         e.preventDefault();
+                        
+                        // Notify that we intercepted a sleeping event
+                        window.dispatchEvent(new CustomEvent('PERSISTENT_EVENT_BLOCKED'));
                     };
                     const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
                     eventsToCatch.forEach(eventName => {
@@ -93,7 +95,6 @@
                     });
 
                     // 4. requestAnimationFrame (rAF) BUSTER
-                    // Stores page render callbacks to force-run them when window is minimized
                     const activeRafCallbacks = new Map();
                     let rafIdCounter = 0;
 
@@ -102,7 +103,6 @@
                         const id = ++rafIdCounter;
                         activeRafCallbacks.set(id, callback);
                         
-                        // Let native rAF try to process normally if window is open
                         nativerAF(function(timestamp) {
                             if (activeRafCallbacks.has(id)) {
                                 activeRafCallbacks.delete(id);
@@ -121,7 +121,6 @@
                         }
                     };
 
-                    // External trigger to flush rendering queue when minimized
                     window.addEventListener('message', function(event) {
                         if (event.data && event.data.type === 'FORCE_RENDER_TICK') {
                             if (activeRafCallbacks.size > 0) {
@@ -142,6 +141,11 @@
         } catch (e) {
             console.error('[PersistentEngine] DOM injection failed:', e);
         }
+
+        // Catch the block notification from page context to increment metrics
+        window.addEventListener('PERSISTENT_EVENT_BLOCKED', () => {
+            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+        });
     }
 
     function enableAudioPulse() {
@@ -182,15 +186,23 @@
                 clientY: 10
             });
             window.dispatchEvent(moveEvent);
+
+            // FIX: Restore sending pause-prevention signal to background database
+            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
+                if (chrome.runtime.lastError) return;
+            });
         }, interval);
     }
 
     function setupBackgroundListener() {
-        // Listen for fast background wake-up pulses (active even when minimized)
         chrome.runtime.onMessage.addListener((message) => {
             if (message && message.type === 'WAKE_UP_PULSE') {
-                // Post event to MAIN world to force flush the rAF render queue
                 window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
+                
+                // Slowly increment counter during active background guard execution
+                if (Math.random() > 0.8) { // Once every few pulses (approx 2-3 seconds)
+                    chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+                }
             }
         });
     }

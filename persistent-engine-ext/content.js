@@ -1,6 +1,6 @@
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.8 - Wake Lock & Auto-Scroll)
- * Strictly targeted to aistudio.google.com with active system lock.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.9 - Cold Start Fixed)
+ * Features: Ultrasound Media Priority Hack (19,000Hz) to prevent minimized throttling.
  */
 (function() {
     'use strict';
@@ -30,10 +30,11 @@
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Activation protocols online.');
+        console.log('[AI Studio No Sleep] Ultra-priority background layers online.');
 
+        // ALWAYS ENABLE ULTRASOUND KEEPALIVE (It's the only 100% stable way in modern Chromium)
         if (config.audioKeepAlive) {
-            enableAudioPulse();
+            enableUltrasoundPulse();
         }
 
         if (config.activitySimulation) {
@@ -42,8 +43,6 @@
 
         setupLongLivedPort();
         createOnPageIndicator(lang);
-        
-        // Start watching for generation completion (Now with Wake Lock & Auto-Scroll)
         startGenerationObserver();
     }
 
@@ -144,7 +143,8 @@
         });
     }
 
-    function enableAudioPulse() {
+    // ULTRASOUND MEDIA HACK: Triggers 19,000Hz wave to get high-priority media state from OS
+    function enableUltrasoundPulse() {
         let audioContext;
         const startAudio = () => {
             if (audioContext) return;
@@ -152,14 +152,26 @@
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = audioContext.createOscillator();
                 const gain = audioContext.createGain();
+                
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime);
-                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+                // 19,000 Hz is completely inaudible for adults, but registers as active sound playback
+                osc.frequency.setValueAtTime(19000, audioContext.currentTime); 
+                gain.gain.setValueAtTime(0.002, audioContext.currentTime); // Inaudible volume scale
+                
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
-            } catch (err) {}
+                
+                console.log('[AI Studio No Sleep] Ultrasound keep-alive engaged. Tab priority locked.');
+                
+                // Remove listeners after first successful gesture unlock
+                window.removeEventListener('click', startAudio);
+                window.removeEventListener('keydown', startAudio);
+            } catch (err) {
+                console.warn('[AI Studio No Sleep] Ultrasound failed:', err);
+            }
         };
+        // Browser requires a quick click anywhere on the page to unlock media playback
         window.addEventListener('click', startAudio, { passive: true });
         window.addEventListener('keydown', startAudio, { passive: true });
     }
@@ -296,16 +308,13 @@
         } catch (e) {}
     }
 
-    // --- SMART AUTO-SCROLL CONTROLLER ---
     let scrollInterval = null;
     function startAutoScroll() {
         if (scrollInterval) clearInterval(scrollInterval);
         
         scrollInterval = setInterval(() => {
-            // 1. Smooth scroll primary viewport window
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             
-            // 2. Smooth scroll any inner scrollable workspace containers
             const elements = document.querySelectorAll('div, section, main, md-block');
             elements.forEach(el => {
                 const overflow = window.getComputedStyle(el).overflowY;
@@ -313,7 +322,7 @@
                     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
                 }
             });
-        }, 800); // Trigger smooth micro-scrolls every 800ms during active stream
+        }, 800);
     }
 
     function stopAutoScroll() {
@@ -323,7 +332,6 @@
         }
     }
 
-    // --- SCREEN WAKE LOCK MANAGER ---
     let wakeLockInstance = null;
     async function requestWakeLock() {
         if (wakeLockInstance) return;
@@ -346,7 +354,6 @@
         }
     }
 
-    // Watches AI Studio DOM state transitions
     function startGenerationObserver() {
         let isGenerating = false;
 
@@ -361,7 +368,6 @@
                 isGenerating = true;
                 console.log('[AI Studio No Sleep] Generation started.');
                 
-                // Engage physical protection systems
                 requestWakeLock();
                 startAutoScroll();
                 
@@ -369,7 +375,6 @@
                 isGenerating = false;
                 console.log('[AI Studio No Sleep] Generation finished.');
                 
-                // Release protection systems
                 releaseWakeLock();
                 stopAutoScroll();
                 

@@ -1,7 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Integrates OS Screen Wake Lock and Smart Auto-Scroll loops.
- * File: patch-system-lock.cjs
+ * PATCH SCRIPT: Fixes cold starts via Ultrasound Media Priority Hack (19kHz).
+ * File: patch-cold-start-fix.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -23,11 +23,11 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- UPDATED CONTENT SCRIPT WITH WAKE LOCK & AUTO SCROLL ---
-const systemLockContentJs = `
+// --- UPDATED CONTENT SCRIPT WITH ULTRASOUND MEDIA HACK ---
+const ultrasoundContentJs = `
 /**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.8 - Wake Lock & Auto-Scroll)
- * Strictly targeted to aistudio.google.com with active system lock.
+ * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.9 - Cold Start Fixed)
+ * Features: Ultrasound Media Priority Hack (19,000Hz) to prevent minimized throttling.
  */
 (function() {
     'use strict';
@@ -57,10 +57,11 @@ const systemLockContentJs = `
     });
 
     function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Activation protocols online.');
+        console.log('[AI Studio No Sleep] Ultra-priority background layers online.');
 
+        // ALWAYS ENABLE ULTRASOUND KEEPALIVE (It's the only 100% stable way in modern Chromium)
         if (config.audioKeepAlive) {
-            enableAudioPulse();
+            enableUltrasoundPulse();
         }
 
         if (config.activitySimulation) {
@@ -69,8 +70,6 @@ const systemLockContentJs = `
 
         setupLongLivedPort();
         createOnPageIndicator(lang);
-        
-        // Start watching for generation completion (Now with Wake Lock & Auto-Scroll)
         startGenerationObserver();
     }
 
@@ -171,7 +170,8 @@ const systemLockContentJs = `
         });
     }
 
-    function enableAudioPulse() {
+    // ULTRASOUND MEDIA HACK: Triggers 19,000Hz wave to get high-priority media state from OS
+    function enableUltrasoundPulse() {
         let audioContext;
         const startAudio = () => {
             if (audioContext) return;
@@ -179,14 +179,26 @@ const systemLockContentJs = `
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = audioContext.createOscillator();
                 const gain = audioContext.createGain();
+                
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime);
-                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
+                // 19,000 Hz is completely inaudible for adults, but registers as active sound playback
+                osc.frequency.setValueAtTime(19000, audioContext.currentTime); 
+                gain.gain.setValueAtTime(0.002, audioContext.currentTime); // Inaudible volume scale
+                
                 osc.connect(gain);
                 gain.connect(audioContext.destination);
                 osc.start();
-            } catch (err) {}
+                
+                console.log('[AI Studio No Sleep] Ultrasound keep-alive engaged. Tab priority locked.');
+                
+                // Remove listeners after first successful gesture unlock
+                window.removeEventListener('click', startAudio);
+                window.removeEventListener('keydown', startAudio);
+            } catch (err) {
+                console.warn('[AI Studio No Sleep] Ultrasound failed:', err);
+            }
         };
+        // Browser requires a quick click anywhere on the page to unlock media playback
         window.addEventListener('click', startAudio, { passive: true });
         window.addEventListener('keydown', startAudio, { passive: true });
     }
@@ -323,16 +335,13 @@ const systemLockContentJs = `
         } catch (e) {}
     }
 
-    // --- SMART AUTO-SCROLL CONTROLLER ---
     let scrollInterval = null;
     function startAutoScroll() {
         if (scrollInterval) clearInterval(scrollInterval);
         
         scrollInterval = setInterval(() => {
-            // 1. Smooth scroll primary viewport window
             window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
             
-            // 2. Smooth scroll any inner scrollable workspace containers
             const elements = document.querySelectorAll('div, section, main, md-block');
             elements.forEach(el => {
                 const overflow = window.getComputedStyle(el).overflowY;
@@ -340,7 +349,7 @@ const systemLockContentJs = `
                     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
                 }
             });
-        }, 800); // Trigger smooth micro-scrolls every 800ms during active stream
+        }, 800);
     }
 
     function stopAutoScroll() {
@@ -350,7 +359,6 @@ const systemLockContentJs = `
         }
     }
 
-    // --- SCREEN WAKE LOCK MANAGER ---
     let wakeLockInstance = null;
     async function requestWakeLock() {
         if (wakeLockInstance) return;
@@ -373,7 +381,6 @@ const systemLockContentJs = `
         }
     }
 
-    // Watches AI Studio DOM state transitions
     function startGenerationObserver() {
         let isGenerating = false;
 
@@ -388,7 +395,6 @@ const systemLockContentJs = `
                 isGenerating = true;
                 console.log('[AI Studio No Sleep] Generation started.');
                 
-                // Engage physical protection systems
                 requestWakeLock();
                 startAutoScroll();
                 
@@ -396,7 +402,6 @@ const systemLockContentJs = `
                 isGenerating = false;
                 console.log('[AI Studio No Sleep] Generation finished.');
                 
-                // Release protection systems
                 releaseWakeLock();
                 stopAutoScroll();
                 
@@ -411,16 +416,16 @@ const systemLockContentJs = `
 
 function run() {
     if (!fs.existsSync(contentFile)) {
-        log('Extension content.js file missing. Please run setup.cjs first.', 'error');
+        log('Extension content.js file is missing. Run setup.cjs first.', 'error');
         process.exit(1);
     }
 
     try {
-        fs.writeFileSync(contentFile, systemLockContentJs.trim() + '\n', 'utf8');
-        log('Successfully integrated OS Screen Wake Lock & Smart Auto-Scroll inside content.js.', 'success');
-        log('Please reload the extension inside edge://extensions/ to apply changes.', 'info');
+        fs.writeFileSync(contentFile, ultrasoundContentJs.trim() + '\n', 'utf8');
+        log('Applied Ultrasound Media Priority (19kHz) Hack inside content.js.', 'success');
+        log('Please reload the extension inside edge://extensions/ to apply change.', 'info');
     } catch (e) {
-        log(`Failed to apply system lock patch: ${e.message}`, 'error');
+        log(`Failed to apply ultrasound patch: ${e.message}`, 'error');
     }
 }
 

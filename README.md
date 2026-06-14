@@ -1,5 +1,7 @@
 # AI Studio No Sleep
 
+Language: **English** | [Русский](README.ru.md)
+
 A secure, privacy-focused extension engineered exclusively for **Google AI Studio** (`aistudio.google.com`). It ensures that long-running text and code generation tasks continue operating smoothly in the background, even when the browser window is completely minimized, occluded, or when you switch to other active desktop applications.
 
 ---

@@ -1,8 +1,7 @@
 /**
  * ============================================================================
- * PATCH SCRIPT: Focuses on Google AI Studio, renames to "AI Studio No Sleep",
- * and adds an elegant in-page floating status indicator.
- * File: patch-aistudio-only.cjs
+ * PATCH SCRIPT: Renders custom Google AI Sparkle & Activity Ring PNG icons.
+ * File: patch-icon.cjs
  * Runtime: Node.js (CommonJS)
  * ============================================================================
  */
@@ -11,12 +10,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
-const targetFolder = path.join(process.cwd(), 'persistent-engine-ext');
-const manifestFile = path.join(targetFolder, 'manifest.json');
-const contentFile = path.join(targetFolder, 'content.js');
-const htmlFile = path.join(targetFolder, 'popup.html');
-const jsFile = path.join(targetFolder, 'popup.js');
+const targetFolder = path.join(process.cwd(), 'persistent-engine-ext', 'icons');
 
 function log(msg, type = 'info') {
     const colors = {
@@ -27,342 +23,139 @@ function log(msg, type = 'info') {
     console.log(`${colors[type] || '[LOG]'} ${msg}`);
 }
 
-// --- 1. UPDATE MANIFEST (Target strict AI Studio URL) ---
-function updateManifest() {
-    if (!fs.existsSync(manifestFile)) return false;
-    try {
-        const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-        
-        manifest.name = "AI Studio No Sleep";
-        manifest.description = "Prevents Google AI Studio from pausing text generation in background tabs.";
-        
-        // Restrict matches only to AI Studio
-        manifest.content_scripts = [
-            {
-                matches: ["https://aistudio.google.com/*"],
-                js: ["content.js"],
-                run_at: "document_start",
-                all_frames: true
+// --- PROGRAMMATIC PNG GENERATION ENGINE WITH GOOGLE AI DESIGN ---
+class GoogleAIPngGenerator {
+    static crc32Table() {
+        if (this._crc32Table) return this._crc32Table;
+        const table = [];
+        for (let i = 0; i < 256; i++) {
+            let c = i;
+            for (let j = 0; j < 8; j++) {
+                c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
             }
-        ];
-        
-        // Restrict host permissions
-        manifest.host_permissions = ["https://aistudio.google.com/*"];
-        
-        fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 4), 'utf8');
-        log('manifest.json updated for strict aistudio.google.com matches.', 'success');
-        return true;
-    } catch (e) {
-        log(`Failed to update manifest: ${e.message}`, 'error');
-        return false;
-    }
-}
-
-// --- 2. UPDATE CONTENT SCRIPT WITH FLOATING ON-PAGE HUD ---
-const updatedContentJs = `
-/**
- * AI STUDIO NO SLEEP - CONTENT SCRIPT (v1.6)
- * Specifically optimized for aistudio.google.com
- */
-(function() {
-    'use strict';
-
-    // Synchronous DOM Hook to intercept visibility and rAF
-    injectDOMHook();
-
-    let config = {
-        engineActive: true,
-        preventThrottling: true,
-        audioKeepAlive: true,
-        activitySimulation: true,
-        heartbeatRate: 15
-    };
-
-    chrome.storage.local.get([
-        'engineActive', 
-        'preventThrottling', 
-        'audioKeepAlive', 
-        'activitySimulation', 
-        'heartbeatRate',
-        'uiLang'
-    ], (result) => {
-        config = { ...config, ...result };
-        if (config.engineActive) {
-            initEngine(result.uiLang || 'RU');
+            table[i] = c;
         }
-    });
+        this._crc32Table = table;
+        return table;
+    }
 
-    function initEngine(lang) {
-        console.log('[AI Studio No Sleep] Active protection layer engaged.');
-
-        if (config.audioKeepAlive) {
-            enableAudioPulse();
+    static crc32(buffer) {
+        const table = this.crc32Table();
+        let crc = 0xFFFFFFFF;
+        for (let i = 0; i < buffer.length; i++) {
+            crc = table[(crc ^ buffer[i]) & 0xFF] ^ (crc >>> 8);
         }
-
-        if (config.activitySimulation) {
-            startVirtualInteractionLoop();
-        }
-
-        setupBackgroundListener();
-        
-        // Render beautiful non-intrusive indicator in the bottom-right corner of AI Studio
-        createOnPageIndicator(lang);
+        return (crc ^ 0xFFFFFFFF) >>> 0;
     }
 
-    function injectDOMHook() {
-        try {
-            const script = document.createElement('script');
-            script.textContent = \`
-                (function() {
-                    'use strict';
-                    
-                    Object.defineProperty(document, 'visibilityState', {
-                        get: () => 'visible',
-                        configurable: true
-                    });
-
-                    Object.defineProperty(document, 'hidden', {
-                        get: () => false,
-                        configurable: true
-                    });
-
-                    document.hasFocus = function() { return true; };
-
-                    const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
-                    blockProperties.forEach(prop => {
-                        Object.defineProperty(document, prop, {
-                            get: () => null,
-                            set: () => {},
-                            configurable: true
-                        });
-                        Object.defineProperty(window, prop, {
-                            get: () => null,
-                            set: () => {},
-                            configurable: true
-                        });
-                    });
-
-                    const silentBlocker = function(e) {
-                        e.stopImmediatePropagation();
-                        e.preventDefault();
-                        window.dispatchEvent(new CustomEvent('PERSISTENT_EVENT_BLOCKED'));
-                    };
-                    const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
-                    eventsToCatch.forEach(eventName => {
-                        window.addEventListener(eventName, silentBlocker, true);
-                        document.addEventListener(eventName, silentBlocker, true);
-                    });
-
-                    // requestAnimationFrame Bypass
-                    const activeRafCallbacks = new Map();
-                    let rafIdCounter = 0;
-
-                    const nativerAF = window.requestAnimationFrame;
-                    window.requestAnimationFrame = function(callback) {
-                        const id = ++rafIdCounter;
-                        activeRafCallbacks.set(id, callback);
-                        
-                        nativerAF(function(timestamp) {
-                            if (activeRafCallbacks.has(id)) {
-                                activeRafCallbacks.delete(id);
-                                try { callback(timestamp); } catch(e) {}
-                            }
-                        });
-                        return id;
-                    };
-
-                    const nativeCancelRAF = window.cancelAnimationFrame;
-                    window.cancelAnimationFrame = function(id) {
-                        if (activeRafCallbacks.has(id)) {
-                            activeRafCallbacks.delete(id);
-                        } else {
-                            nativeCancelRAF(id);
-                        }
-                    };
-
-                    window.addEventListener('message', function(event) {
-                        if (event.data && event.data.type === 'FORCE_RENDER_TICK') {
-                            if (activeRafCallbacks.size > 0) {
-                                const now = performance.now();
-                                const callbacks = Array.from(activeRafCallbacks.entries());
-                                activeRafCallbacks.clear();
-                                
-                                callbacks.forEach(function([id, cb]) {
-                                    try { cb(now); } catch(err) {}
-                                });
-                            }
-                        }
-                    });
-                })();
-            \`;
-            (document.head || document.documentElement).appendChild(script);
-            script.remove();
-        } catch (e) {
-            console.error('[AI Studio No Sleep] DOM injection failed:', e);
-        }
-
-        window.addEventListener('PERSISTENT_EVENT_BLOCKED', () => {
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
-        });
+    static createChunk(type, data) {
+        const len = data.length;
+        const buf = Buffer.alloc(8 + len + 4);
+        buf.writeUInt32BE(len, 0);
+        buf.write(type, 4, 4, 'ascii');
+        data.copy(buf, 8);
+        const crcVal = this.crc32(buf.subarray(4, 8 + len));
+        buf.writeUInt32BE(crcVal, 8 + len);
+        return buf;
     }
 
-    function enableAudioPulse() {
-        let audioContext;
-        const startAudio = () => {
-            if (audioContext) return;
-            try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioContext.createOscillator();
-                const gain = audioContext.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1, audioContext.currentTime);
-                gain.gain.setValueAtTime(0.001, audioContext.currentTime);
-                osc.connect(gain);
-                gain.connect(audioContext.destination);
-                osc.start();
-            } catch (err) {}
-        };
-        window.addEventListener('click', startAudio, { passive: true });
-        window.addEventListener('keydown', startAudio, { passive: true });
-    }
+    /**
+     * Renders Google AI Sparkle (Astroid Math) & glowing green Keep-Alive ring.
+     */
+    static generateIconBuffer(size) {
+        const rawPixels = Buffer.alloc(size * size * 4);
+        const center = size / 2;
+        const ringRadius = size * 0.38;
+        const ringThickness = Math.max(1.5, size * 0.05);
+        const starRadius = size * 0.24;
 
-    function startVirtualInteractionLoop() {
-        const interval = (config.heartbeatRate || 15) * 1000;
-        setInterval(() => {
-            if (!config.engineActive) return;
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const idx = (y * size + x) * 4;
+                const dx = x - center;
+                const dy = y - center;
+                const dist = Math.sqrt(dx * dx + dy * dy);
 
-            const moveEvent = new MouseEvent('mousemove', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-                clientX: 10,
-                clientY: 10
-            });
-            window.dispatchEvent(moveEvent);
+                // 1. Math check for outer Active Ring
+                const inRing = Math.abs(dist - ringRadius) <= (ringThickness / 2);
 
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
-                if (chrome.runtime.lastError) return;
-            });
-        }, interval);
-    }
+                // 2. Math check for Google AI Sparkle (Astroid equation: x^(2/3) + y^(2/3) <= 1)
+                const ndx = Math.abs(dx) / starRadius;
+                const ndy = Math.abs(dy) / starRadius;
+                const inStar = (Math.pow(ndx, 2/3) + Math.pow(ndy, 2/3)) <= 1;
 
-    function setupBackgroundListener() {
-        chrome.runtime.onMessage.addListener((message) => {
-            if (message && message.type === 'WAKE_UP_PULSE') {
-                window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
-                if (Math.random() > 0.8) {
-                    chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+                if (inStar) {
+                    // Radiant Google AI core: White center fading to vibrant magenta-violet edges
+                    const starDist = Math.pow(ndx, 2/3) + Math.pow(ndy, 2/3); // 0 at core, 1 at edge
+                    rawPixels[idx] = Math.round(255 - starDist * 60);      // R (White to Light Violet)
+                    rawPixels[idx + 1] = Math.round(255 - starDist * 200);  // G
+                    rawPixels[idx + 2] = 255;                              // B
+                    rawPixels[idx + 3] = 255;                              // Alpha
+                } else if (inRing) {
+                    // Glowing Emerald Green Protection Ring
+                    rawPixels[idx] = 16;                                   // R
+                    rawPixels[idx + 1] = 185;                              // G
+                    rawPixels[idx + 2] = 129;                              // B
+                    rawPixels[idx + 3] = 255;                              // Alpha
+                } else {
+                    // Transparent pixels for modern look
+                    rawPixels[idx] = 0;
+                    rawPixels[idx + 1] = 0;
+                    rawPixels[idx + 2] = 0;
+                    rawPixels[idx + 3] = 0;
                 }
             }
-        });
+        }
+        return rawPixels;
     }
 
-    // Creates an elegant status card inside AI Studio web page
-    function createOnPageIndicator(lang) {
-        const text = lang === 'RU' ? 'Без сна: Активен' : 'No Sleep: Active';
-        
-        const container = document.createElement('div');
-        container.id = 'ai-studio-nosleep-hud';
-        container.style.cssText = \`
-            position: fixed;
-            bottom: 12px;
-            right: 12px;
-            background-color: #1e293b;
-            color: #f8fafc;
-            border: 1px solid #334155;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 999999;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        \`;
+    static buildPNG(size) {
+        const header = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+        const ihdrData = Buffer.alloc(13);
+        ihdrData.writeUInt32BE(size, 0);
+        ihdrData.writeUInt32BE(size, 4);
+        ihdrData[8] = 8; ihdrData[9] = 6; ihdrData[10] = 0; ihdrData[11] = 0; ihdrData[12] = 0;
+        const ihdrChunk = this.createChunk('IHDR', ihdrData);
 
-        const dot = document.createElement('div');
-        dot.style.cssText = \`
-            width: 8px;
-            height: 8px;
-            background-color: #10b981;
-            border-radius: 50%;
-            box-shadow: 0 0 8px #10b981;
-        \`;
+        const rawPixels = this.generateIconBuffer(size);
+        const filteredData = Buffer.alloc(size * (size * 4 + 1));
+        let srcOffset = 0; let destOffset = 0;
 
-        // Pulse keyframe animation using standard style tag
-        const style = document.createElement('style');
-        style.textContent = \`
-            @keyframes hudPulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.2); opacity: 0.6; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-        \`;
-        document.head.appendChild(style);
-        dot.style.animation = 'hudPulse 2s infinite ease-in-out';
+        for (let y = 0; y < size; y++) {
+            filteredData[destOffset++] = 0;
+            rawPixels.copy(filteredData, destOffset, srcOffset, srcOffset + size * 4);
+            destOffset += size * 4; srcOffset += size * 4;
+        }
 
-        const label = document.createElement('span');
-        label.innerText = text;
+        const deflated = zlib.deflateSync(filteredData, { level: 9 });
+        const idatChunk = this.createChunk('IDAT', deflated);
+        const iendChunk = this.createChunk('IEND', Buffer.alloc(0));
 
-        container.appendChild(dot);
-        container.appendChild(label);
-        document.body.appendChild(container);
-    }
-})();
-`;
-
-// --- 3. PATCH POPUP HTML LOGOS ---
-function updateHtml() {
-    if (!fs.existsSync(htmlFile)) return false;
-    try {
-        let html = fs.readFileSync(htmlFile, 'utf8');
-        // Update main branding text
-        html = html.replace('ЗАЩИТА ОТ ПАУЗ', 'AI STUDIO NO SLEEP');
-        html = html.replace('PERSISTENT ENGINE', 'AI STUDIO NO SLEEP');
-        fs.writeFileSync(htmlFile, html, 'utf8');
-        log('popup.html brand names updated.', 'success');
-        return true;
-    } catch (e) {
-        log(`Failed to update html: ${e.message}`, 'error');
-        return false;
+        return Buffer.concat([header, ihdrChunk, idatChunk, iendChunk]);
     }
 }
 
-// --- 4. PATCH POPUP JS LOCALIZATION ---
-function updateJs() {
-    if (!fs.existsSync(jsFile)) return false;
-    try {
-        let js = fs.readFileSync(jsFile, 'utf8');
-        // Simple string replaces for new names
-        js = js.replace('logo: "ЗАЩИТА ОТ ПАУЗ"', 'logo: "AI STUDIO NO SLEEP"');
-        js = js.replace('logo: "ANTI-PAUSE GUARD"', 'logo: "AI STUDIO NO SLEEP"');
-        fs.writeFileSync(jsFile, js, 'utf8');
-        log('popup.js localizations updated.', 'success');
-        return true;
-    } catch (e) {
-        log(`Failed to update js: ${e.message}`, 'error');
-        return false;
+// --- RUN DESIGN TRANSFORMATION ---
+function execute() {
+    if (!fs.existsSync(targetFolder)) {
+        log(`Folder not found: ${targetFolder}. Please make sure setup has run first.`, 'error');
+        process.exit(1);
     }
-}
 
-function run() {
-    log('Transitioning project focus exclusively to Google AI Studio...', 'info');
-    const m = updateManifest();
-    const c = fs.writeFileSync(contentFile, updatedContentJs.trim() + '\n', 'utf8');
-    log('content.js updated with floating On-Page status indicator.', 'success');
-    const h = updateHtml();
-    const j = updateJs();
-
-    if (m && h && j) {
+    try {
+        const sizes = [16, 48, 128];
+        for (const size of sizes) {
+            const pngBuf = GoogleAIPngGenerator.buildPNG(size);
+            const iconPath = path.join(targetFolder, `icon${size}.png`);
+            fs.writeFileSync(iconPath, pngBuf);
+            log(`Rendered custom Google AI style PNG: icon${size}.png`, 'success');
+        }
         log('----------------------------------------------------', 'success');
-        log('AI Studio No Sleep branding and scope lock complete!', 'success');
-        log('The extension will now only execute on aistudio.google.com tabs.', 'success');
-        log('Please reload the extension inside edge://extensions/.', 'info');
+        log('AI Studio No Sleep design successfully updated!', 'success');
+        log('Please reload the extension inside edge://extensions/ to see the new gorgeous icons.', 'info');
+    } catch (e) {
+        log(`Failed to apply new design patch: ${e.message}`, 'error');
     }
 }
 
-run();
+execute();

@@ -1,6 +1,5 @@
 /**
- * SIMPLIFIED UI CONTROLLER
- * Translated from developer terminology into plain, non-tech human language.
+ * SIMPLIFIED UI CONTROLLER WITH NEON VISUAL PULSE
  */
 
 const LOCALIZATION = {
@@ -8,11 +7,12 @@ const LOCALIZATION = {
         logo: "AI STUDIO NO SLEEP",
         engineTitle: "Background protection",
         engineDesc: "Text will keep generating even if you minimize the browser or switch to another tab.",
-        metPrevented: "ACTIVE WORK CYCLES",
-        statusActive: "PROTECTION WORKING",
+        metPrevented: "PROTECTION HEALTH",
+        statusActive: "PROTECTION ACTIVE",
         statusIdle: "PROTECTION PAUSED",
         btnShowAdv: "Show extra options",
         btnHideAdv: "Hide extra options",
+        cyclesLabel: "Activity cycles: ",
         
         modThrottleTitle: "Force Background Speed",
         modThrottleDesc: "Ensure text continues loading at normal speed in the background.",
@@ -26,11 +26,12 @@ const LOCALIZATION = {
         logo: "AI STUDIO NO SLEEP",
         engineTitle: "Работа в фоне",
         engineDesc: "Текст продолжит создаваться, даже если вы свернете браузер или перейдете в другую вкладку.",
-        metPrevented: "АКТИВНЫЕ ЦИКЛЫ РАБОТЫ",
+        metPrevented: "АКТИВНОСТЬ ЗАЩИТЫ",
         statusActive: "ЗАЩИТА РАБОТАЕТ",
         statusIdle: "ЗАЩИТА НА ПАУЗЕ",
         btnShowAdv: "Показать дополнительные настройки",
         btnHideAdv: "Скрыть дополнительные настройки",
+        cyclesLabel: "Циклы активности: ",
         
         modThrottleTitle: "Ускорение работы в фоне",
         modThrottleDesc: "Позволяет тексту генерироваться с обычной скоростью в фоне.",
@@ -53,7 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
         engineDesc: document.getElementById('txt-engine-desc'),
         metPrevented: document.getElementById('txt-met-prevented'),
         statusLabel: document.getElementById('statusLabel'),
+        cyclesLabel: document.getElementById('txt-cycles-label'),
         
+        pulseVisualizer: document.getElementById('pulseVisualizer'),
         toggleAdvanced: document.getElementById('toggleAdvanced'),
         advancedPanel: document.getElementById('advancedPanel'),
         
@@ -88,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.engineTitle.innerText = t.engineTitle;
         dom.engineDesc.innerText = t.engineDesc;
         dom.metPrevented.innerText = t.metPrevented;
+        dom.cyclesLabel.innerText = t.cyclesLabel;
         
         dom.modThrottleTitle.innerText = t.modThrottleTitle;
         dom.modThrottleDesc.innerText = t.modThrottleDesc;
@@ -106,12 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateStatusLabel() {
         const isActive = dom.engineActive.checked;
         const t = LOCALIZATION[currentLang];
+        
         if (isActive) {
             dom.statusLabel.innerText = t.statusActive;
             dom.statusLabel.style.color = 'var(--success)';
+            dom.pulseVisualizer.classList.add('active'); // Start neon animations
         } else {
             dom.statusLabel.innerText = t.statusIdle;
             dom.statusLabel.style.color = 'var(--danger)';
+            dom.pulseVisualizer.classList.remove('active'); // Freeze neon animations
         }
     }
 
@@ -122,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.toggleAdvanced.innerText = isOpen ? t.btnHideAdv : t.btnShowAdv;
     });
 
-    // Load initial storage states
+    // Load initial states
     chrome.storage.local.get([
         'engineActive', 'preventThrottling', 'audioKeepAlive', 'activitySimulation', 'savedCyclesCount', 'uiLang'
     ], (result) => {
@@ -136,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateLanguage(lang);
     });
 
-    // LIVE UPDATE LISTENER: React to storage changes immediately
+    // Live update counter
     chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local' && changes.savedCyclesCount) {
             const newVal = changes.savedCyclesCount.newValue || 0;

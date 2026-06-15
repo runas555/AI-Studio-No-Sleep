@@ -5,7 +5,22 @@
 (function() {
     'use strict';
 
-    injectDOMHook();
+    // SAFE SEND MESSAGE HELPER (Предотвращает падение при обновлении контекста)
+    function safeSendMessage(message, callback) {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id) {
+            chrome.runtime.sendMessage(message, (response) => {
+                const lastError = chrome.runtime.lastError;
+                if (callback) {
+                    callback(response, lastError);
+                }
+            });
+        } else {
+            console.warn('[AI Studio No Sleep] Context invalidated. Message skipped:', message.type);
+        }
+    }
+
+
+    /* DOM Hooking перенесен в MAIN world через manifest.json */
 
     let config = {
         engineActive: true,
@@ -34,6 +49,7 @@
 
         if (config.audioKeepAlive) {
             enableInfrasoundPulse();
+            startMediaKeepAlive(); // Активация невидимого видеопотока для обхода троттлинга
         }
 
         if (config.activitySimulation) {
@@ -45,99 +61,9 @@
     }
 
     function injectDOMHook() {
-        try {
-            const script = document.createElement('script');
-            script.textContent = `
-                (function() {
-                    'use strict';
-                    
-                    Object.defineProperty(document, 'visibilityState', {
-                        get: () => 'visible',
-                        configurable: true
-                    });
-
-                    Object.defineProperty(document, 'hidden', {
-                        get: () => false,
-                        configurable: true
-                    });
-
-                    document.hasFocus = function() { return true; };
-
-                    const blockProperties = ['onvisibilitychange', 'onwebkitvisibilitychange', 'onblur', 'onfocus'];
-                    blockProperties.forEach(prop => {
-                        Object.defineProperty(document, prop, {
-                            get: () => null,
-                            set: () => {},
-                            configurable: true
-                        });
-                        Object.defineProperty(window, prop, {
-                            get: () => null,
-                            set: () => {},
-                            configurable: true
-                        });
-                    });
-
-                    const silentBlocker = function(e) {
-                        e.stopImmediatePropagation();
-                        e.preventDefault();
-                        window.dispatchEvent(new CustomEvent('PERSISTENT_EVENT_BLOCKED'));
-                    };
-                    const eventsToCatch = ['visibilitychange', 'webkitvisibilitychange', 'blur', 'focusout', 'pagehide', 'freeze'];
-                    eventsToCatch.forEach(eventName => {
-                        window.addEventListener(eventName, silentBlocker, true);
-                        document.addEventListener(eventName, silentBlocker, true);
-                    });
-
-                    // requestAnimationFrame queue
-                    const activeRafCallbacks = new Map();
-                    let rafIdCounter = 0;
-
-                    const nativerAF = window.requestAnimationFrame;
-                    window.requestAnimationFrame = function(callback) {
-                        const id = ++rafIdCounter;
-                        activeRafCallbacks.set(id, callback);
-                        
-                        nativerAF(function(timestamp) {
-                            if (activeRafCallbacks.has(id)) {
-                                activeRafCallbacks.delete(id);
-                                try { callback(timestamp); } catch(e) {}
-                            }
-                        });
-                        return id;
-                    };
-
-                    const nativeCancelRAF = window.cancelAnimationFrame;
-                    window.cancelAnimationFrame = function(id) {
-                        if (activeRafCallbacks.has(id)) {
-                            activeRafCallbacks.delete(id);
-                        } else {
-                            nativeCancelRAF(id);
-                        }
-                    };
-
-                    window.addEventListener('message', function(event) {
-                        if (event.data && event.data.type === 'FORCE_RENDER_TICK') {
-                            if (activeRafCallbacks.size > 0) {
-                                const now = performance.now();
-                                const callbacks = Array.from(activeRafCallbacks.entries());
-                                activeRafCallbacks.clear();
-                                
-                                callbacks.forEach(function([id, cb]) {
-                                    try { cb(now); } catch(err) {}
-                                });
-                            }
-                        }
-                    });
-                })();
-            `;
-            (document.head || document.documentElement).appendChild(script);
-            script.remove();
-        } catch (e) {
-            console.error('[AI Studio No Sleep] DOM injection failed:', e);
-        }
-
+        // Пересылка сигналов предотвращения паузы из MAIN world в фоновый сервис-воркер
         window.addEventListener('PERSISTENT_EVENT_BLOCKED', () => {
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+            safeSendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
         });
     }
 
@@ -180,7 +106,7 @@
             });
             window.dispatchEvent(moveEvent);
 
-            chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
+            safeSendMessage({ type: 'SIGNAL_PREVENT_PAUSE' }, () => {
                 if (chrome.runtime.lastError) return;
             });
         }, interval);
@@ -193,7 +119,7 @@
             if (msg.type === 'WAKE_UP_PULSE') {
                 window.postMessage({ type: 'FORCE_RENDER_TICK' }, '*');
                 if (Math.random() > 0.8) {
-                    chrome.runtime.sendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
+                    safeSendMessage({ type: 'SIGNAL_PREVENT_PAUSE' });
                 }
             }
         });
@@ -224,36 +150,20 @@
         // 1. Force native document bottom
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 
-        // 2. Scan for all potential viewports (including Angular CDK specific selectors)
-        const targets = document.querySelectorAll('cdk-virtual-scroll-viewport, .scrollbar-handle, .ng-scrollbar-handle, [class*="viewport"], [class*="scroll"], div, section, main');
-        
+        // 2. Вычисление скролл-контейнеров на основе их реального CSS-состояния
+        const targets = document.querySelectorAll('cdk-virtual-scroll-viewport, div, section, main');
         targets.forEach(el => {
-            if (el.scrollHeight > el.clientHeight) {
-                // Set absolute scroll height limit
-                el.scrollTop = el.scrollHeight + 5000;
-                
-                // CRITICAL FIX: Dispatch native scroll event so Angular Virtual Scroll intercepts it!
-                el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
-            }
+            try {
+                const style = window.getComputedStyle(el);
+                const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+                if (isScrollable) {
+                    el.scrollTop = el.scrollHeight + 5000;
+                    el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
+                }
+            } catch (e) {}
         });
 
-        // 3. Fallback trace through custom handles parents
-        const customHandles = document.querySelectorAll('.scrollbar-handle, .ng-scrollbar-handle, [class*="scrollbar-handle"]');
-        customHandles.forEach(handle => {
-            let parent = handle.parentElement;
-            while (parent && parent !== document.body) {
-                const innerViewports = parent.querySelectorAll('[class*="viewport"], [class*="scroll"], div');
-                innerViewports.forEach(vp => {
-                    if (vp.scrollHeight > vp.clientHeight) {
-                        vp.scrollTop = vp.scrollHeight + 5000;
-                        vp.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
-                    }
-                });
-                parent = parent.parentElement;
-            }
-        });
-
-        // 4. LOW-LEVEL KEYBOARD EMULATION: Emulate physical 'End' key on active element
+        // 3. LOW-LEVEL KEYBOARD EMULATION: Эмуляция клавиши End на активном элементе
         try {
             const activeEl = document.activeElement || document.body;
             const endEvent = new KeyboardEvent('keydown', {
@@ -314,7 +224,7 @@
         const minutes = Math.floor(stopwatchSeconds / 60).toString().padStart(2, '0');
         const seconds = (stopwatchSeconds % 60).toString().padStart(2, '0');
 
-        chrome.runtime.sendMessage({ 
+        safeSendMessage({ 
             type: 'SHOW_OS_NOTIFICATION', 
             duration: `${minutes}:default${seconds}` 
         });
@@ -377,7 +287,7 @@
                 startAutoScroll();
                 startStopwatch();
                 
-                chrome.runtime.sendMessage({ type: 'SET_BADGE_ON' });
+                safeSendMessage({ type: 'SET_BADGE_ON' });
                 
                 window.addEventListener('beforeunload', preventTabClose, { capture: true });
                 
@@ -399,7 +309,7 @@
                     stopStopwatch();
                     triggerFinishNotifications(lang);
                     
-                    chrome.runtime.sendMessage({ type: 'SET_BADGE_CHECKMARK' });
+                    safeSendMessage({ type: 'SET_BADGE_CHECKMARK' });
                 }, 220);
                 
                 window.removeEventListener('beforeunload', preventTabClose, { capture: true });
@@ -407,5 +317,41 @@
         });
 
         observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // СИНТЕЗАТОР НЕВИДИМОГО ВИДЕОПОТОКА (Обход системного троттлинга Chromium)
+    function startMediaKeepAlive() {
+        try {
+            if (document.getElementById('ai-no-sleep-media-keepalive')) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.id = 'ai-no-sleep-media-keepalive';
+            canvas.width = 1;
+            canvas.height = 1;
+            canvas.style.display = 'none';
+            (document.body || document.documentElement).appendChild(canvas);
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.fillStyle = 'rgba(0,0,0,0.01)';
+                ctx.fillRect(0, 0, 1, 1);
+            }
+
+            const stream = canvas.captureStream ? canvas.captureStream(1) : null;
+            if (stream) {
+                const video = document.createElement('video');
+                video.muted = true;
+                video.loop = true;
+                video.srcObject = stream;
+                video.style.display = 'none';
+                (document.body || document.documentElement).appendChild(video);
+                
+                // Автозапуск замутированного видео разрешен политикой браузера
+                video.play().catch(() => {});
+                console.log('[AI Studio No Sleep] Canvas-to-Video keepalive engaged.');
+            }
+        } catch (e) {
+            console.warn('[AI Studio No Sleep] Media keepalive failed:', e);
+        }
     }
 })();

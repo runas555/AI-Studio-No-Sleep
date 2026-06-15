@@ -1,7 +1,9 @@
 let activePulseInterval = null;
+let lastTabActivationTime = 0;
 const connectedPorts = new Set();
 
 chrome.runtime.onInstalled.addListener(() => {
+    chrome.alarms.create('sw-keepalive', { periodInMinutes: 1 });
     chrome.storage.local.set({
         engineActive: true,
         preventThrottling: true,
@@ -31,14 +33,35 @@ function broadcastWakeUp() {
         }
     });
 
+    const now = Date.now();
+    // Ограничиваем частоту микро-активаций (не чаще одного раза в 15 секунд)
+    const shouldActivate = (now - lastTabActivationTime) > 15000;
+
     chrome.tabs.query({}, (tabs) => {
         tabs.forEach(tab => {
             if (tab.url && tab.url.includes('aistudio.google.com')) {
                 chrome.tabs.update(tab.id, { autoDiscardable: false }, () => {
                     if (chrome.runtime.lastError) return;
                 });
+
+                // БЕЗОПАСНАЯ МИКРО-АКТИВАЦИЯ ВКЛАДКИ
+                if (shouldActivate) {
+                    chrome.windows.get(tab.windowId, (win) => {
+                        if (chrome.runtime.lastError) return;
+                        // Активируем вкладку только если её родительское окно НЕ сфокусировано в данный момент
+                        if (win && !win.focused && !tab.active) {
+                            chrome.tabs.update(tab.id, { active: true }, () => {
+                                if (chrome.runtime.lastError) return;
+                                console.log('[AI Studio No Sleep] Background tab micro-activated.');
+                            });
+                        }
+                    });
+                }
             }
         });
+        if (shouldActivate) {
+            lastTabActivationTime = now;
+        }
     });
 }
 
@@ -141,5 +164,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
         sendResponse({ ack: true });
         return false;
+    }
+});
+
+
+// ALARM KEEP-ALIVE SYSTEM
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'sw-keepalive') {
+        console.log('[AI Studio No Sleep] SW Wakeup Alarm triggered.');
+        if (!activePulseInterval) startGlobalPulse();
     }
 });

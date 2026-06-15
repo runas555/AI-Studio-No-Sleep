@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "AI Studio No Sleep",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Prevents Google AI Studio from pausing text generation in background tabs.",
     "permissions": [
         "storage",

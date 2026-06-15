@@ -15,6 +15,8 @@ const LOCALIZATION = {
         modAudioDesc: "Prevents browser from putting your background tab to sleep.",
         modPulseTitle: "Imitate Activity",
         modPulseDesc: "Moves a virtual cursor to bypass site idle detectors.",
+        modScrollTitle: "Auto-Scroll Page",
+        modScrollDesc: "Automatically scrolls down to the bottom during text generation.",
         footer: "Compatible with Microsoft Edge & Google Chrome"
     },
     RU: {
@@ -33,6 +35,8 @@ const LOCALIZATION = {
         modAudioDesc: "Не дает браузеру переводить фоновую вкладку в режим энергосбережения.",
         modPulseTitle: "Имитация активности",
         modPulseDesc: "Двигает виртуальную мышь для обхода защиты сайтов от бездействия.",
+        modScrollTitle: "Автопрокрутка экрана",
+        modScrollDesc: "Автоматически опускает экран вниз при генерации ответа.",
         footer: "Совместимо с Microsoft Edge и Google Chrome"
     }
 };
@@ -63,6 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
         preventThrottling: document.getElementById('preventThrottling'),
         audioKeepAlive: document.getElementById('audioKeepAlive'),
         activitySimulation: document.getElementById('activitySimulation'),
+        modScrollTitle: document.getElementById('txt-mod-scroll-title'),
+        modScrollDesc: document.getElementById('txt-mod-scroll-desc'),
+        autoScrollActive: document.getElementById('autoScrollActive'),
         counterVal: document.getElementById('counterVal')
     };
 
@@ -87,6 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.modAudioDesc.innerText = t.modAudioDesc;
         dom.modPulseTitle.innerText = t.modPulseTitle;
         dom.modPulseDesc.innerText = t.modPulseDesc;
+        dom.modScrollTitle.innerText = t.modScrollTitle;
+        dom.modScrollDesc.innerText = t.modScrollDesc;
         dom.footer.innerText = t.footer;
         const isPanelOpen = dom.advancedPanel.classList.contains('open');
         dom.toggleAdvanced.innerText = isPanelOpen ? t.btnHideAdv : t.btnShowAdv;
@@ -121,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.preventThrottling.checked = result.preventThrottling !== false;
         dom.audioKeepAlive.checked = result.audioKeepAlive !== false;
         dom.activitySimulation.checked = result.activitySimulation !== false;
+        dom.autoScrollActive.checked = result.autoScrollActive !== false;
         dom.counterVal.innerText = (result.savedCyclesCount || 0).toLocaleString();
         const lang = result.uiLang || 'RU';
         updateLanguage(lang);

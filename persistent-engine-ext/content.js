@@ -147,23 +147,53 @@
     // --- ADAPTIVE UNBREAKABLE SCROLL ENGINE ---
     // Forces coordinates and dispatches native 'scroll' events to trigger Angular CDK digests
     function performAdaptiveScroll() {
-        // 1. Force native document bottom
+        // 1. Принудительный скроллинг основного окна
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 
-        // 2. Вычисление скролл-контейнеров на основе их реального CSS-состояния
-        const targets = document.querySelectorAll('cdk-virtual-scroll-viewport, div, section, main');
-        targets.forEach(el => {
-            try {
-                const style = window.getComputedStyle(el);
-                const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
-                if (isScrollable) {
-                    el.scrollTop = el.scrollHeight + 5000;
-                    el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
-                }
-            } catch (e) {}
-        });
+        // 2. Логическое определение активного контейнера генерации
+        // Ищем текстовые блоки сообщений (абзацы, код, преформатированный текст)
+        const messageBlocks = document.querySelectorAll('p, pre, code, .message-content, [class*="message"], [class*="response"]');
+        let scrollTargetFound = false;
 
-        // 3. LOW-LEVEL KEYBOARD EMULATION: Эмуляция клавиши End на активном элементе
+        if (messageBlocks.length > 0) {
+            // Берем самый последний текстовый блок (он соответствует текущему ответу ИИ)
+            const lastBlock = messageBlocks[messageBlocks.length - 1];
+            let parent = lastBlock.parentElement;
+
+            // Поднимаемся вверх по дереву DOM в поисках ближайшего скроллируемого родителя
+            while (parent && parent !== document.body) {
+                try {
+                    const style = window.getComputedStyle(parent);
+                    const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight;
+                    
+                    if (isScrollable) {
+                        // Скроллим строго этот контейнер вниз
+                        parent.scrollTop = parent.scrollHeight + 10000;
+                        parent.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
+                        scrollTargetFound = true;
+                        break; // Мы нашли точечный контейнер генерации, останавливаем поиск
+                    }
+                } catch (e) {}
+                parent = parent.parentElement;
+            }
+        }
+
+        // 3. Резервный вариант: если точечный контейнер не найден, скроллим все потенциальные viewport-ы
+        if (!scrollTargetFound) {
+            const fallbacks = document.querySelectorAll('cdk-virtual-scroll-viewport, div, section, main');
+            fallbacks.forEach(el => {
+                try {
+                    const style = window.getComputedStyle(el);
+                    const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+                    if (isScrollable) {
+                        el.scrollTop = el.scrollHeight + 5000;
+                        el.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
+                    }
+                } catch (e) {}
+            });
+        }
+
+        // 4. LOW-LEVEL KEYBOARD EMULATION: Эмуляция клавиши End на активном элементе для доводки фокуса
         try {
             const activeEl = document.activeElement || document.body;
             const endEvent = new KeyboardEvent('keydown', {
@@ -274,9 +304,10 @@
 
         const observer = new MutationObserver(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
+            const stopWords = ['stop', 'cancel', 'остановить', 'отмена', 'отменить', 'detener', 'cancelar', 'stoppen', 'abbrechen', 'arrêter', 'annuler', '停止', '取消', 'キャンセル'];
             const hasStopButton = buttons.some(btn => {
                 const text = btn.innerText ? btn.innerText.toLowerCase() : '';
-                return text.includes('stop') || text.includes('cancel');
+                return stopWords.some(word => text.includes(word));
             });
 
             if (hasStopButton && !isGenerating) {
@@ -294,20 +325,23 @@
             } else if (!hasStopButton && isGenerating) {
                 isGenerating = false;
                 
+                
                 releaseWakeLock();
                 stopAutoScroll();
                 
-                // MICRO-LOOP HARD COORD RESET (Fires 3 times to sync late Angular rendering chunks)
-                performAdaptiveScroll();
+                if (config.autoScrollActive !== false) {
+                    performAdaptiveScroll();
+                    setTimeout(() => { performAdaptiveScroll(); }, 60);
+                    setTimeout(() => { performAdaptiveScroll(); }, 120);
+                }
                 
-                setTimeout(() => { performAdaptiveScroll(); }, 60);
-                setTimeout(() => { performAdaptiveScroll(); }, 120);
-                
-                // Finalize only after the final render ticks have landed and synced
                 setTimeout(() => {
-                    performAdaptiveScroll(); // One last check
+                    if (config.autoScrollActive !== false) {
+                        performAdaptiveScroll();
+                    }
                     stopStopwatch();
                     triggerFinishNotifications(lang);
+      
                     
                     safeSendMessage({ type: 'SET_BADGE_CHECKMARK' });
                 }, 220);

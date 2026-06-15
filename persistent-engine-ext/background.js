@@ -159,12 +159,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ ack: true });
         return false;
     }
+    
     if (request.type === 'SET_BADGE_CHECKMARK') {
         chrome.action.setBadgeText({ text: "✓" }); // Unicode green checkmark
         chrome.action.setBadgeBackgroundColor({ color: "#10b981" });
         sendResponse({ ack: true });
         return false;
     }
+    if (request.type === 'SET_BADGE_ERROR') {
+        chrome.action.setBadgeText({ text: "ERR" });
+        chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+        sendResponse({ ack: true });
+        return false;
+    }
+    if (request.type === 'SHOW_OS_ERROR_NOTIFICATION') {
+        chrome.storage.local.get(['uiLang'], (res) => {
+            const title = "AI Studio - Error";
+            const message = (res.uiLang || 'RU') === 'RU'
+                ? "Внимание! Фоновая генерация прервана из-за ошибки."
+                : "Attention! Background generation was interrupted by an error.";
+
+            try {
+                chrome.notifications.create('generation_error', {
+                    type: 'basic',
+                    iconUrl: 'icons/icon128.png',
+                    title: title,
+                    message: message,
+                    priority: 2
+                });
+            } catch (e) {}
+        });
+        sendResponse({ ack: true });
+        return false;
+    }
+      
 });
 
 

@@ -150,36 +150,31 @@
         // 1. Принудительный скроллинг основного окна
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
 
-        // 2. Логическое определение активного контейнера генерации
-        // Ищем текстовые блоки сообщений (абзацы, код, преформатированный текст)
-        const messageBlocks = document.querySelectorAll('p, pre, code, .message-content, [class*="message"], [class*="response"]');
-        let scrollTargetFound = false;
+        // 2. Поиск последнего текстового блока ответа
+        const messageBlocks = document.querySelectorAll('p, pre, code, .message-content, [class*="message"], [class*="response"], [class*="chat-entry"]');
+        let scrolled = false;
 
         if (messageBlocks.length > 0) {
-            // Берем самый последний текстовый блок (он соответствует текущему ответу ИИ)
             const lastBlock = messageBlocks[messageBlocks.length - 1];
-            let parent = lastBlock.parentElement;
-
-            // Поднимаемся вверх по дереву DOM в поисках ближайшего скроллируемого родителя
-            while (parent && parent !== document.body) {
-                try {
-                    const style = window.getComputedStyle(parent);
-                    const isScrollable = (style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.scrollHeight > parent.clientHeight;
-                    
-                    if (isScrollable) {
-                        // Скроллим строго этот контейнер вниз
-                        parent.scrollTop = parent.scrollHeight + 10000;
-                        parent.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
-                        scrollTargetFound = true;
-                        break; // Мы нашли точечный контейнер генерации, останавливаем поиск
-                    }
-                } catch (e) {}
-                parent = parent.parentElement;
-            }
+            try {
+                // Использование нативного браузерного метода авто-скроллинга до видимости элемента
+                lastBlock.scrollIntoView({ behavior: 'instant', block: 'end' });
+                scrolled = true;
+            } catch (e) {}
         }
 
-        // 3. Резервный вариант: если точечный контейнер не найден, скроллим все потенциальные viewport-ы
-        if (!scrollTargetFound) {
+        // 3. Резервный поиск контейнера .chat-view-container и его прямая прокрутка
+        const chatContainers = document.querySelectorAll('.chat-view-container, [class*="chat-view"], [class*="chat-container"]');
+        chatContainers.forEach(container => {
+            try {
+                container.scrollTop = container.scrollHeight + 10000;
+                container.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
+                scrolled = true;
+            } catch (e) {}
+        });
+
+        // 4. Глубокий скроллинг всех остальных потенциальных областей (fallback)
+        if (!scrolled) {
             const fallbacks = document.querySelectorAll('cdk-virtual-scroll-viewport, div, section, main');
             fallbacks.forEach(el => {
                 try {
@@ -193,7 +188,7 @@
             });
         }
 
-        // 4. LOW-LEVEL KEYBOARD EMULATION: Эмуляция клавиши End на активном элементе для доводки фокуса
+        // 5. LOW-LEVEL KEYBOARD EMULATION: Эмуляция клавиши End на активном элементе
         try {
             const activeEl = document.activeElement || document.body;
             const endEvent = new KeyboardEvent('keydown', {
@@ -302,6 +297,7 @@
             }
         }, 2000);
 
+        
         const observer = new MutationObserver(() => {
             const buttons = Array.from(document.querySelectorAll('button'));
             const stopWords = ['stop', 'cancel', 'остановить', 'отмена', 'отменить', 'detener', 'cancelar', 'stoppen', 'abbrechen', 'arrêter', 'annuler', '停止', '取消', 'キャンセル'];
@@ -310,7 +306,12 @@
                 return stopWords.some(word => text.includes(word));
             });
 
-            if (hasStopButton && !isGenerating) {
+            // Вторичный триггер: наличие мигающего текстового курсора генерации на странице
+            const hasGeneratingCursor = document.querySelector('.generating, .cursor, .blink, [class*="generating"], [class*="cursor"]') !== null;
+            const isCurrentlyGenerating = hasStopButton || hasGeneratingCursor;
+
+            if (isCurrentlyGenerating && !isGenerating) {
+    
                 isGenerating = true;
                 
                 stopTabTitleFlashing();
@@ -322,8 +323,10 @@
                 
                 window.addEventListener('beforeunload', preventTabClose, { capture: true });
                 
-            } else if (!hasStopButton && isGenerating) {
+            
+            } else if (!isCurrentlyGenerating && isGenerating) {
                 isGenerating = false;
+    
                 
                 
                 releaseWakeLock();
@@ -335,16 +338,23 @@
                     setTimeout(() => { performAdaptiveScroll(); }, 120);
                 }
                 
+                
                 setTimeout(() => {
                     if (config.autoScrollActive !== false) {
                         performAdaptiveScroll();
                     }
                     stopStopwatch();
-                    triggerFinishNotifications(lang);
-      
                     
-                    safeSendMessage({ type: 'SET_BADGE_CHECKMARK' });
+                    const isFailed = checkForErrors();
+                    if (isFailed) {
+                        safeSendMessage({ type: 'SHOW_OS_ERROR_NOTIFICATION' });
+                        safeSendMessage({ type: 'SET_BADGE_ERROR' });
+                    } else {
+                        triggerFinishNotifications(lang);
+                        safeSendMessage({ type: 'SET_BADGE_CHECKMARK' });
+                    }
                 }, 220);
+      
                 
                 window.removeEventListener('beforeunload', preventTabClose, { capture: true });
             }
@@ -387,5 +397,25 @@
         } catch (e) {
             console.warn('[AI Studio No Sleep] Media keepalive failed:', e);
         }
+    }
+
+    // ФУНКЦИЯ ДЕТЕКЦИИ ОШИБОК ГЕНЕРАЦИИ В DOM
+    function checkForErrors() {
+        try {
+            // Ищем стандартные контейнеры ошибок Angular, Snackbar и элементы с классами ошибок
+            const errorElements = document.querySelectorAll('.error-message, [class*="error"], .mat-mdc-snack-bar-container, .error-container, [role="alert"]');
+            const errorKeywords = ['error', 'failed', 'limit', 'exhausted', 'ошибка', 'превышен', 'сбой', 'cancel', 'quota'];
+            
+            for (let el of errorElements) {
+                if (el.offsetHeight > 0 || el.offsetWidth > 0) {
+                    const text = (el.innerText || el.textContent || '').toLowerCase();
+                    const matchesKeyword = errorKeywords.some(word => text.includes(word));
+                    if (matchesKeyword) {
+                        return true;
+                    }
+                }
+            }
+        } catch (e) {}
+        return false;
     }
 })();

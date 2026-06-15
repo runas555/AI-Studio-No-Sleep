@@ -40,6 +40,65 @@
         document.addEventListener(eventName, silentBlocker, true);
     });
 
+    // ПЕРЕОПРЕДЕЛЕНИЕ INTERSECTIONOBSERVER для обхода виртуализации Angular CDK
+    // Заставляет виртуальный скролл верить, что элементы всегда находятся в зоне видимости экрана
+    const NativeIntersectionObserver = window.IntersectionObserver;
+    if (NativeIntersectionObserver) {
+        window.IntersectionObserver = class MockIntersectionObserver {
+            constructor(callback, options) {
+                this.callback = callback;
+                this.options = options;
+                this.observedElements = new Set();
+                
+                this.nativeObserver = new NativeIntersectionObserver((entries, observer) => {
+                    const mockedEntries = entries.map(entry => {
+                        return {
+                            time: entry.time,
+                            rootBounds: entry.rootBounds,
+                            boundingClientRect: entry.boundingClientRect,
+                            intersectionRect: entry.boundingClientRect, // Имитируем полное пересечение границ
+                            isIntersecting: true,                      // Всегда true
+                            intersectionRatio: 1.0,                    // Всегда 100% видимости
+                            target: entry.target
+                        };
+                    });
+                    try { callback(mockedEntries, this); } catch(e) {}
+                }, options);
+            }
+
+            observe(target) {
+                this.observedElements.add(target);
+                this.nativeObserver.observe(target);
+                
+                // Мгновенный принудительный триггер видимости для инициализации рендеринга Angular
+                setTimeout(() => {
+                    if (this.observedElements.has(target)) {
+                        const mockEntry = [{
+                            time: performance.now(),
+                            rootBounds: null,
+                            boundingClientRect: target.getBoundingClientRect(),
+                            intersectionRect: target.getBoundingClientRect(),
+                            isIntersecting: true,
+                            intersectionRatio: 1.0,
+                            target: target
+                        }];
+                        try { this.callback(mockEntry, this); } catch(e) {}
+                    }
+                }, 0);
+            }
+
+            unobserve(target) {
+                this.observedElements.delete(target);
+                this.nativeObserver.unobserve(target);
+            }
+
+            disconnect() {
+                this.observedElements.clear();
+                this.nativeObserver.disconnect();
+            }
+        };
+    }
+
     // Принудительный обход троттлинга requestAnimationFrame в фоновом режиме
     const activeRafCallbacks = new Map();
     let rafIdCounter = 0;
